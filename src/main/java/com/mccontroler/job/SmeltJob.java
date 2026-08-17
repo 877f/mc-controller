@@ -507,6 +507,13 @@ public final class SmeltJob implements Job {
     }
 
     @Override
+    public void resume() {
+        if (phase == Phase.GO_TO_STATION && furnacePos != null) {
+            BaritoneBridge.travelTo(furnacePos);
+        }
+    }
+
+    @Override
     public void cancel() {
         var player = Minecraft.getInstance().player;
         if (player != null && phase != Phase.START) {

@@ -582,6 +582,13 @@ public final class CraftJob implements Job {
     }
 
     @Override
+    public void resume() {
+        if (phase == Phase.GO_TO_STATION && tablePos != null) {
+            BaritoneBridge.travelTo(tablePos);
+        }
+    }
+
+    @Override
     public void cancel() {
         var player = Minecraft.getInstance().player;
         if (player != null && phase != Phase.START) {

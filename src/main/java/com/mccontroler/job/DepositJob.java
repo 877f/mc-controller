@@ -169,6 +169,13 @@ public final class DepositJob implements Job {
     }
 
     @Override
+    public void resume() {
+        if (chest != null && phase == Phase.TRAVEL) {
+            BaritoneBridge.travelTo(chest);
+        }
+    }
+
+    @Override
     public void cancel() {
         BaritoneBridge.stop();
         Screens.closeAny();

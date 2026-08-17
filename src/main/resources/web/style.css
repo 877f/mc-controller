@@ -760,3 +760,127 @@ textarea {
     .tab { padding: 12px 14px; }
     main { padding: 16px 14px calc(var(--dock-h) + 20px); }
 }
+
+/* ══ Inventory list ════════════════════════════════════════════ */
+
+.invlist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 4px;
+    max-height: 340px;
+    overflow-y: auto;
+}
+
+.invlist li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 9px;
+    background: var(--bg-sunken);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+}
+
+.invlist li.is-equipped { border-color: var(--accent-deep); }
+
+.invlist img {
+    width: 20px;
+    height: 20px;
+    image-rendering: pixelated;
+    flex: 0 0 auto;
+}
+
+.inv-name {
+    flex: 1;
+    font-size: 12.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.inv-count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+}
+
+/* Durability only appears on tools, and goes red as it approaches useless — the tool belt
+   treats anything under 10% as already gone, so that is where the colour flips. */
+.inv-dur {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: var(--line-soft);
+    color: var(--text-faint);
+}
+
+.inv-dur.is-low { background: rgb(248 113 113 / 0.18); color: var(--danger); }
+
+/* ══ Plan preview ══════════════════════════════════════════════ */
+
+.planbox {
+    margin-bottom: 16px;
+    text-align: left;
+    background: var(--bg-sunken);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+}
+
+.planbox__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 11px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--line);
+}
+
+.plan {
+    list-style: none;
+    margin: 0;
+    padding: 8px 11px;
+    max-height: 220px;
+    overflow-y: auto;
+    font-size: 12.5px;
+}
+
+.plan li {
+    display: flex;
+    gap: 8px;
+    padding: 3px 0;
+    color: var(--text-dim);
+}
+
+.plan li::before {
+    content: attr(data-kind);
+    flex: 0 0 52px;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    padding-top: 2px;
+}
+
+.plan li.k-have { color: var(--text-faint); }
+.plan li.k-mine::before { color: var(--warn); }
+.plan li.k-craft::before,
+.plan li.k-smelt::before { color: var(--accent); }
+.plan .plan-err { color: var(--danger); }
+
+.field--inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0 0;
+}
+
+.field--inline > label { margin: 0; flex: 1; }

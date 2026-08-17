@@ -86,8 +86,9 @@ public final class EventStream {
     }
 
     /** Pushes the current job state: title, 0..1 progress, and whether anything is running. */
-    public static void job(String title, float progress, boolean active) {
-        emit("job", Json.obj("title", title, "progress", progress, "active", active));
+    public static void job(String title, float progress, boolean active, boolean paused) {
+        emit("job", Json.obj("title", title, "progress", progress,
+                "active", active, "paused", paused));
     }
 
     private static void emit(String event, String jsonData) {

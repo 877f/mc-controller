@@ -117,6 +117,13 @@ public final class ExcavateJob implements Job {
     }
 
     @Override
+    public void resume() {
+        if (started) {
+            BaritoneBridge.clearArea(cornerA, cornerB);
+        }
+    }
+
+    @Override
     public void cancel() {
         if (started) {
             BaritoneBridge.stop();

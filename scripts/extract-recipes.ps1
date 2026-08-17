@@ -161,6 +161,26 @@ foreach ($entry in $entries) {
             $tok = Read-Ingredient $r.ingredient
             if ($tok) { $counts[$tok] = 1 }
         }
+        '^stonecutting$' {
+            # One block in, one or more out, at a stonecutter. Often far cheaper than the crafting
+            # recipe for the same thing: stairs cost six stone on a bench and one on a cutter.
+            $kind = "cut"
+            $grid = 0
+            $tok = Read-Ingredient $r.ingredient
+            if ($tok) { $counts[$tok] = 1 }
+        }
+        '^smithing_transform$' {
+            # Template + base + addition at a smithing table. This is the only route to netherite
+            # gear. Note the template itself is bastion-chest loot, so the planner can only finish
+            # this when the player already owns one — it cannot be mined or crafted from scratch.
+            $kind = "smith"
+            $grid = 0
+            foreach ($part in @($r.template, $r.base, $r.addition)) {
+                $tok = Read-Ingredient $part
+                if (-not $tok) { continue }
+                if ($counts.Contains($tok)) { $counts[$tok] += 1 } else { $counts[$tok] = 1 }
+            }
+        }
         default {
             # crafting_transmute, stonecutting, smithing_*, and the special crafting_* recipes
             # are not modelled by the planner yet.

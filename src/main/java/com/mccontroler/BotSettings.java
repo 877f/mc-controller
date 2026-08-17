@@ -27,8 +27,20 @@ public final class BotSettings {
             "autoTorch", true,
             "autoRespawn", true);
 
+    /**
+     * Numeric settings, with their defaults.
+     *
+     * <p>{@code depositAtFreeSlots} is the number of free slots left before the bot breaks off to
+     * bank its load. Waiting for completely full meant every big dig ended with the last stretch
+     * mining into an inventory that could not accept anything, so the count silently stopped
+     * rising. Zero keeps the old behaviour of only unloading when totally full.
+     */
+    private static final Map<String, Integer> NUMBER_DEFAULTS = Map.of(
+            "depositAtFreeSlots", 3);
+
     private static final Object LOCK = new Object();
     private static Map<String, Boolean> values;
+    private static Map<String, Integer> numbers;
 
     private BotSettings() {
     }
@@ -52,6 +64,33 @@ public final class BotSettings {
         }
     }
 
+    /** Value of a numeric setting, clamped to something sane. */
+    public static int getNumber(String name) {
+        ensureLoaded();
+        synchronized (LOCK) {
+            return numbers.getOrDefault(name, NUMBER_DEFAULTS.getOrDefault(name, 0));
+        }
+    }
+
+    public static Map<String, Integer> allNumbers() {
+        ensureLoaded();
+        synchronized (LOCK) {
+            return new LinkedHashMap<>(numbers);
+        }
+    }
+
+    public static void setNumber(String name, int value) {
+        if (!NUMBER_DEFAULTS.containsKey(name)) {
+            return;
+        }
+        synchronized (LOCK) {
+            ensureLoaded();
+            // 35 free slots of 36 would trigger a bank run on the first cobblestone.
+            numbers.put(name, Math.max(0, Math.min(30, value)));
+            persist();
+        }
+    }
+
     public static void set(String name, boolean on) {
         if (!DEFAULTS.containsKey(name)) {
             return;
@@ -69,6 +108,7 @@ public final class BotSettings {
                 return;
             }
             values = new LinkedHashMap<>(DEFAULTS);
+            numbers = new LinkedHashMap<>(NUMBER_DEFAULTS);
 
             Path path = file();
             if (!Files.exists(path)) {
@@ -77,8 +117,17 @@ public final class BotSettings {
             try {
                 for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
                     String[] parts = line.split("\t");
-                    if (parts.length == 2 && DEFAULTS.containsKey(parts[0])) {
+                    if (parts.length != 2) {
+                        continue;
+                    }
+                    if (DEFAULTS.containsKey(parts[0])) {
                         values.put(parts[0], Boolean.parseBoolean(parts[1]));
+                    } else if (NUMBER_DEFAULTS.containsKey(parts[0])) {
+                        try {
+                            numbers.put(parts[0], Integer.parseInt(parts[1].trim()));
+                        } catch (NumberFormatException ignored) {
+                            // malformed line; keep the default
+                        }
                     }
                 }
             } catch (IOException e) {
@@ -90,6 +139,9 @@ public final class BotSettings {
     private static void persist() {
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Boolean> entry : values.entrySet()) {
+            sb.append(entry.getKey()).append('\t').append(entry.getValue()).append('\n');
+        }
+        for (Map.Entry<String, Integer> entry : numbers.entrySet()) {
             sb.append(entry.getKey()).append('\t').append(entry.getValue()).append('\n');
         }
         try {

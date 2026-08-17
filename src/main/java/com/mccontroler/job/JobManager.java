@@ -1,5 +1,7 @@
 package com.mccontroler.job;
 
+import com.mccontroler.bot.BaritoneBridge;
+import com.mccontroler.inv.Screens;
 import com.mccontroler.web.EventStream;
 
 import java.util.ArrayDeque;
@@ -28,6 +30,16 @@ public final class JobManager {
 
     /** Set from any thread to ask the running job to stop. */
     private volatile boolean stopRequested;
+
+    /**
+     * Set from any thread to hold the queue where it is.
+     *
+     * <p>Stop is destructive: it cancels the job and throws away the rest of the plan. Pause is
+     * the answer to "I want my keyboard back for a minute" — the active job simply stops being
+     * ticked, and Baritone is told to let go, so control returns to the player. Nothing is
+     * cancelled and nothing is lost.
+     */
+    private volatile boolean paused;
 
     private JobManager() {
     }
@@ -59,6 +71,37 @@ public final class JobManager {
 
     public boolean isBusy() {
         return active != null;
+    }
+
+    public boolean isPaused() {
+        return paused;
+    }
+
+    /**
+     * Holds or resumes the queue.
+     *
+     * <p>Pausing hands control back to the player by stopping Baritone, so the bot does not keep
+     * walking. Resuming lets the active job pick up from wherever it left off — jobs re-read the
+     * world each tick, so there is no stale state to repair.
+     */
+    public void setPaused(boolean value) {
+        if (paused == value) {
+            return;
+        }
+        paused = value;
+        if (value) {
+            BaritoneBridge.stop();
+            Screens.closeAny();
+            EventStream.log("paused — the bot has stopped and you have control", "ok");
+        } else {
+            // The active job handed work to Baritone before the pause and Baritone has since been
+            // stopped; without this it would see an idle Baritone and report that it gave up.
+            if (active != null) {
+                active.resume();
+            }
+            EventStream.log("resumed", "ok");
+        }
+        broadcast();
     }
 
     /**
@@ -122,7 +165,13 @@ public final class JobManager {
     public void tick() {
         if (stopRequested) {
             stopRequested = false;
+            paused = false;
             handleStop();
+        }
+
+        // Stop is still honoured while paused (handled above); everything else waits.
+        if (paused) {
+            return;
         }
 
         Job queued;
@@ -221,6 +270,6 @@ public final class JobManager {
     }
 
     private void broadcast() {
-        EventStream.job(activeTitle(), Math.max(0f, activeProgress()), active != null);
+        EventStream.job(activeTitle(), Math.max(0f, activeProgress()), active != null, paused);
     }
 }

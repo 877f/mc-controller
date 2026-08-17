@@ -1,5 +1,6 @@
 package com.mccontroler.job;
 
+import com.mccontroler.BotSettings;
 import com.mccontroler.bot.BaritoneBridge;
 import com.mccontroler.inv.HomeChest;
 import com.mccontroler.inv.InventoryHelper;
@@ -114,14 +115,20 @@ public final class MineJob implements Job {
         }
 
         // A full inventory silently stops collection, which otherwise looks like "none left".
-        if (InventoryHelper.isFull()) {
+        // Banking a few slots early avoids the tail of every big dig being spent breaking blocks
+        // that have nowhere to go.
+        int spare = BotSettings.getNumber("depositAtFreeSlots");
+        boolean outOfRoom = HomeChest.isSet()
+                ? InventoryHelper.freeSlots() <= spare
+                : InventoryHelper.isFull();
+        if (outOfRoom) {
             BaritoneBridge.stop();
             int remaining = wanted - (have - startCount);
 
             // With a home chest set this is a round trip, not a dead end: bank the load, then
             // pick the job back up where it left off.
             if (HomeChest.isSet()) {
-                EventStream.log("inventory full — going to unload, then carrying on", "ok");
+                EventStream.log("running out of room — going to unload, then carrying on", "ok");
                 JobManager.get().submitFront(new MineJob(itemId, displayName, remaining, targets));
                 JobManager.get().submitFront(new DepositJob());
                 return Job.State.DONE;
@@ -208,6 +215,13 @@ public final class MineJob implements Job {
                 new MineJob(itemId, displayName, Math.max(1, remaining), targets, true));
         JobManager.get().submitFront(new AcquireJob(needed, 1));
         return Job.State.DONE;
+    }
+
+    @Override
+    public void resume() {
+        if (started) {
+            BaritoneBridge.mine(wanted, targets.toArray(new String[0]));
+        }
     }
 
     @Override

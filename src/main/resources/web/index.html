@@ -48,6 +48,17 @@
         <div id="grid" class="grid" role="listbox" aria-label="Items"></div>
         <p id="grid-empty" class="empty" hidden>Nothing matches that search.</p>
 
+        <details class="card card--collapse" id="inv-card">
+            <summary>
+                <span class="card__title">What the bot is carrying</span>
+                <span class="card__hint" id="inv-summary">open to load</span>
+            </summary>
+            <div class="card__body">
+                <ul id="inv-list" class="invlist"></ul>
+                <p id="inv-empty" class="empty" hidden>Carrying nothing.</p>
+            </div>
+        </details>
+
         <details class="card card--collapse" id="list-card">
             <summary>
                 <span class="card__title">Queue a list</span>
@@ -303,6 +314,14 @@
                         </label>
                     </li>
                 </ul>
+
+                <div class="field field--inline">
+                    <label for="set-deposit">Unload when this many slots are left</label>
+                    <input id="set-deposit" type="number" min="0" max="30" class="qty">
+                </div>
+                <p class="hint">Only applies once a home chest is set. The bot breaks off, banks
+                    its load and carries on where it left off. 0 waits until it is completely
+                    full, which wastes the tail of every long dig.</p>
             </div>
         </div>
 
@@ -369,6 +388,7 @@
             <button id="drop-junk" class="btn btn--sm" title="Throw away bulk stone and dirt to free slots">Drop junk</button>
             <button id="diagnose" class="btn btn--sm" title="Capture the bot's current state">Diagnose</button>
             <button id="copy-log" class="btn btn--sm" title="Copy the whole log to the clipboard">Copy log</button>
+            <button id="pause" class="btn" hidden>Pause</button>
             <button id="stop" class="btn btn--stop" hidden>Stop</button>
         </div>
     </div>
@@ -399,7 +419,16 @@
             <button data-count="64">64</button>
             <button data-count="256">256</button>
         </div>
+        <div id="sheet-plan" class="planbox" hidden>
+            <div class="planbox__head">
+                <span>Plan</span>
+                <button id="plan-close" class="btn btn--sm">Back</button>
+            </div>
+            <ol id="plan-steps" class="plan"></ol>
+        </div>
+
         <div class="sheet__actions">
+            <button id="sheet-preview" class="btn">Preview</button>
             <button id="sheet-add" class="btn">Add to list</button>
             <span class="row__spacer"></span>
             <button id="sheet-cancel" class="btn">Cancel</button>

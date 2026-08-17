@@ -35,7 +35,11 @@ public final class RecipeTable {
 
     public enum Kind {
         CRAFT,
-        SMELT
+        SMELT,
+        /** Stonecutter. One block in, one or more out, and usually far cheaper than crafting. */
+        CUT,
+        /** Smithing table: template + base + addition. The only route to netherite gear. */
+        SMITH
     }
 
     /** One input: any of {@code alternatives} will do, {@code qty} of it needed. */
@@ -325,7 +329,12 @@ public final class RecipeTable {
             return null;
         }
         try {
-            Kind kind = parts[0].equals("smelt") ? Kind.SMELT : Kind.CRAFT;
+            Kind kind = switch (parts[0]) {
+                case "smelt" -> Kind.SMELT;
+                case "cut" -> Kind.CUT;
+                case "smith" -> Kind.SMITH;
+                default -> Kind.CRAFT;
+            };
             int count = Integer.parseInt(parts[2]);
             int grid = Integer.parseInt(parts[3]);
 

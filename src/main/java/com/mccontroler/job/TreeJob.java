@@ -222,6 +222,13 @@ public final class TreeJob implements Job {
     }
 
     @Override
+    public void resume() {
+        if (started) {
+            BaritoneBridge.mine(Math.max(0, target), logId);
+        }
+    }
+
+    @Override
     public void cancel() {
         if (started) {
             BaritoneBridge.stop();

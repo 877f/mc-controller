@@ -307,12 +307,21 @@ public final class ApiHandler implements HttpHandler {
                         for (var toggle : BotSettings.all().entrySet()) {
                             entries.add(Json.quote(toggle.getKey()) + ":" + toggle.getValue());
                         }
+                        for (var number : BotSettings.allNumbers().entrySet()) {
+                            entries.add(Json.quote(number.getKey()) + ":" + number.getValue());
+                        }
                         Http.sendJson(ex, 200, "{" + String.join(",", entries) + "}");
                     }
                     case "POST" -> {
                         Map<String, String> body = Json.parseFlat(Http.readBody(ex));
                         for (var entry : body.entrySet()) {
-                            BotSettings.set(entry.getKey(), Boolean.parseBoolean(entry.getValue()));
+                            // Numeric settings arrive as digits, toggles as true/false.
+                            String raw = entry.getValue();
+                            if (raw != null && raw.matches("-?\\d+")) {
+                                BotSettings.setNumber(entry.getKey(), Integer.parseInt(raw));
+                            } else {
+                                BotSettings.set(entry.getKey(), Boolean.parseBoolean(raw));
+                            }
                         }
                         EventStream.log("settings updated", "ok");
                         Http.sendJson(ex, 200, Json.obj("saved", true));
@@ -404,6 +413,39 @@ public final class ApiHandler implements HttpHandler {
                 }
                 boolean removed = GameThread.get(() -> JobManager.get().removePending(index));
                 Http.sendJson(ex, removed ? 200 : 404, Json.obj("removed", removed));
+            }
+            case "/inventory" -> {
+                if (!method.equals("GET")) {
+                    Http.sendError(ex, 405, "use GET");
+                    return;
+                }
+                String json = GameThread.get(() -> {
+                    List<String> rows = new ArrayList<>();
+                    for (InventoryHelper.Held held : InventoryHelper.contents()) {
+                        rows.add(Json.obj("id", held.id(), "name", held.name(),
+                                "count", held.count(), "durability", held.durability(),
+                                "equipped", held.equipped()));
+                    }
+                    return Json.obj("free", InventoryHelper.freeSlots(),
+                            "items", Json.lit("[" + String.join(",", rows) + "]"));
+                });
+                Http.sendJson(ex, 200, json);
+            }
+            case "/job/pause" -> {
+                if (!method.equals("POST")) {
+                    Http.sendError(ex, 405, "use POST");
+                    return;
+                }
+                Map<String, String> body = Json.parseFlat(Http.readBody(ex));
+                // Absent means "flip it", so one button can serve both directions.
+                boolean want = body.containsKey("paused")
+                        ? Boolean.parseBoolean(body.get("paused"))
+                        : !JobManager.get().isPaused();
+                GameThread.get(() -> {
+                    JobManager.get().setPaused(want);
+                    return null;
+                });
+                Http.sendJson(ex, 200, Json.obj("paused", want));
             }
             case "/job/stop" -> {
                 if (method.equals("POST")) {

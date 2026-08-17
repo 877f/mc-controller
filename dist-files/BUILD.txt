@@ -48,19 +48,19 @@ BUILD THE MOD
 
     .\gradlew.bat build
 
-The jar lands in build\libs\mccontroler-1.2.jar
+The jar lands in build\libs\mccontroler-1.3.jar
 
 Just the mod jar, for a machine that already has Baritone:
 
     .\gradlew.bat exportJar
 
-    -> export\mccontroler-1.2.jar
+    -> export\mccontroler-1.3.jar
 
 The mod plus Baritone plus these notes, as one zip:
 
     .\gradlew.bat packageMod
 
-    -> build\distributions\MCControler-1.2.zip
+    -> build\distributions\MCControler-1.3.zip
 
 The version comes from mod_version in gradle.properties; change it there and every
 file name follows.

@@ -8,9 +8,13 @@ import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /** Reads the local player's inventory. Client thread only. */
@@ -68,6 +72,63 @@ public final class InventoryHelper {
     /** True when the main inventory has no empty slot left. */
     public static boolean isFull() {
         return freeSlots() == 0;
+    }
+
+    /**
+     * One line per distinct item carried.
+     *
+     * @param id       registry id
+     * @param name     display name
+     * @param count    total across every stack
+     * @param durability percentage of durability left, or -1 for items that do not wear out
+     * @param equipped true when this is the item currently in hand
+     */
+    public record Held(String id, String name, int count, int durability, boolean equipped) {
+    }
+
+    /**
+     * What the bot is carrying, biggest stacks first.
+     *
+     * <p>Stacks of the same item are folded together, since "47 cobblestone" is what you want to
+     * know, not that it happens to be spread over three slots. Damage is reported because a tool
+     * at 4% is the difference between a plan that works and one that strands halfway.
+     */
+    public static List<Held> contents() {
+        var player = Minecraft.getInstance().player;
+        if (player == null) {
+            return List.of();
+        }
+        Inventory inv = player.getInventory();
+        ItemStack inHand = player.getMainHandItem();
+
+        Map<Item, Held> folded = new LinkedHashMap<>();
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack stack = inv.getItem(i);
+            if (stack.isEmpty()) {
+                continue;
+            }
+            Item item = stack.getItem();
+            int left = stack.isDamageableItem()
+                    ? Math.round(100f * (stack.getMaxDamage() - stack.getDamageValue()) / stack.getMaxDamage())
+                    : -1;
+            boolean equipped = !inHand.isEmpty() && inHand.getItem() == item;
+
+            Held prior = folded.get(item);
+            if (prior == null) {
+                folded.put(item, new Held(BuiltInRegistries.ITEM.getKey(item).toString(),
+                        stack.getHoverName().getString(), stack.getCount(), left, equipped));
+            } else {
+                // Keep the lowest durability seen: that is the one about to break.
+                int worst = prior.durability() < 0 ? left
+                        : (left < 0 ? prior.durability() : Math.min(prior.durability(), left));
+                folded.put(item, new Held(prior.id(), prior.name(),
+                        prior.count() + stack.getCount(), worst, prior.equipped() || equipped));
+            }
+        }
+
+        List<Held> out = new ArrayList<>(folded.values());
+        out.sort(Comparator.comparingInt(Held::count).reversed());
+        return out;
     }
 
     /**

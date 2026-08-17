@@ -129,6 +129,13 @@ public final class TravelJob implements Job {
     }
 
     @Override
+    public void resume() {
+        if (started && resolved != null) {
+            BaritoneBridge.travelTo(resolved);
+        }
+    }
+
+    @Override
     public void cancel() {
         if (started) {
             BaritoneBridge.stop();

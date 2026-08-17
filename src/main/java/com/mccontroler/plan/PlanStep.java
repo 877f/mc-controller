@@ -27,7 +27,11 @@ public record PlanStep(Kind kind,
         /** Craft it from ingredients produced by earlier steps. */
         CRAFT,
         /** Smelt it from an input produced by earlier steps. */
-        SMELT
+        SMELT,
+        /** Cut it from a block at a stonecutter. */
+        CUT,
+        /** Upgrade it at a smithing table from a template, a base item and an addition. */
+        SMITH
     }
 
     public static PlanStep have(String id, String name, int count) {
@@ -46,6 +50,14 @@ public record PlanStep(Kind kind,
         return new PlanStep(Kind.SMELT, id, name, count, List.of(id), 0);
     }
 
+    public static PlanStep cut(String id, String name, int count) {
+        return new PlanStep(Kind.CUT, id, name, count, List.of(id), 0);
+    }
+
+    public static PlanStep smith(String id, String name, int count) {
+        return new PlanStep(Kind.SMITH, id, name, count, List.of(id), 0);
+    }
+
     /** True when this step cannot be done with the player's own 2x2 grid. */
     public boolean needsTable() {
         return kind == Kind.CRAFT && grid > 2;
@@ -61,6 +73,8 @@ public record PlanStep(Kind kind,
             case CRAFT -> "craft " + count + " × " + displayName
                     + (needsTable() ? " (crafting table)" : "");
             case SMELT -> "smelt " + count + " × " + displayName;
+            case CUT -> "cut " + count + " × " + displayName + " (stonecutter)";
+            case SMITH -> "upgrade " + count + " × " + displayName + " (smithing table)";
         };
     }
 }

@@ -207,7 +207,18 @@ public final class CraftPlanner {
 
         String itemId = id(item);
 
-        List<RecipeTable.Recipe> candidates = RecipeTable.producing(itemId);
+        // Stonecutter and smithing recipes are extracted and understood, but nothing can execute
+        // them yet — there is no job that drives those two stations. Planning through them would
+        // produce a route that looks right and then dies at the first step, which is worse than
+        // routing the long way round, so they are held back until their jobs exist.
+        List<RecipeTable.Recipe> candidates = new ArrayList<>();
+        for (RecipeTable.Recipe candidate : RecipeTable.producing(itemId)) {
+            if (candidate.kind() == RecipeTable.Kind.CUT
+                    || candidate.kind() == RecipeTable.Kind.SMITH) {
+                continue;
+            }
+            candidates.add(candidate);
+        }
 
         // Where this item can be dug up: blocks whose loot yields it (diamond from diamond ore),
         // plus the block itself when it generates in the world. Both are filtered against the
@@ -446,9 +457,12 @@ public final class CraftPlanner {
         }
 
         int produced = runs * perRun;
-        steps.add(recipe.kind() == RecipeTable.Kind.SMELT
-                ? PlanStep.smelt(id(item), name(item), produced)
-                : PlanStep.craft(id(item), name(item), produced, recipe.grid()));
+        steps.add(switch (recipe.kind()) {
+            case SMELT -> PlanStep.smelt(id(item), name(item), produced);
+            case CUT -> PlanStep.cut(id(item), name(item), produced);
+            case SMITH -> PlanStep.smith(id(item), name(item), produced);
+            case CRAFT -> PlanStep.craft(id(item), name(item), produced, recipe.grid());
+        });
 
         return new Branch(steps, scratch, mined, produced);
     }

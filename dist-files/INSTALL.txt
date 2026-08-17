@@ -22,7 +22,7 @@ INSTALL
 
 2. Copy BOTH jars from this zip's mods/ folder into your mods folder:
 
-       mccontroler-1.2.jar
+       mccontroler-1.3.jar
        baritone-api-neoforge-1.18.0.jar
 
    Windows:  %APPDATA%\.minecraft\mods\

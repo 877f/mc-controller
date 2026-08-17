@@ -173,6 +173,15 @@ public final class BuildJob implements Job {
     }
 
     @Override
+    public void resume() {
+        // Rebuilding the schematic from the same corners is cheap and avoids holding a second
+        // copy of it just for this.
+        if (started) {
+            started = false;
+        }
+    }
+
+    @Override
     public void cancel() {
         if (started) {
             BaritoneBridge.stop();

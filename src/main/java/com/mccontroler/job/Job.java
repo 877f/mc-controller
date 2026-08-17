@@ -30,6 +30,18 @@ public interface Job {
     /** Called when the job is cancelled or replaced, to release anything it grabbed. */
     void cancel();
 
+    /**
+     * Called when the queue comes back off pause, before the next {@link #tick()}.
+     *
+     * <p>Pausing stops Baritone so the player gets their controls back, which means every job
+     * that had handed work to Baritone is now looking at an idle one. Most of them read that as
+     * "Baritone gave up" and fail, so anything driving Baritone re-issues its command here.
+     * Progress counters are deliberately left alone: re-baselining them would make the job mine
+     * its whole quota a second time.
+     */
+    default void resume() {
+    }
+
     /** Failure reason; only meaningful after {@link #tick()} returns {@link State#FAILED}. */
     default String error() {
         return "";

@@ -108,6 +108,7 @@ function openSheet(item) {
     $('#sheet-icon').src = iconUrl(item.id);
     $('#sheet-name').textContent = item.name;
     $('#sheet-id').textContent = item.id;
+    $('#sheet-plan').hidden = true;
     $('#sheet').hidden = false;
     $('#sheet-count').focus();
     $('#sheet-count').select();
@@ -172,9 +173,13 @@ function openEventStream() {
 
     es.addEventListener('job', (e) => {
         const d = JSON.parse(e.data);
-        $('#job-title').textContent = d.title || 'Idle';
+        $('#job-title').textContent = (d.paused ? 'Paused — ' : '') + (d.title || 'Idle');
         $('#progress-bar').style.width = `${Math.round((d.progress ?? 0) * 100)}%`;
         $('#stop').hidden = !d.active;
+        const pause = $('#pause');
+        pause.hidden = !d.active;
+        pause.textContent = d.paused ? 'Resume' : 'Pause';
+        pause.classList.toggle('btn--go', d.paused);
     });
 
     // EventSource retries on its own, but a mod restart closes the stream for good.
@@ -310,6 +315,13 @@ function wire() {
         if (e.key === 'Enter') $('#sheet-go').click();
     });
 
+    // Preview asks the planner what it would do without committing to it. Worth a look before
+    // handing over an hour of mining.
+    $('#sheet-preview').addEventListener('click', previewPlan);
+    $('#plan-close').addEventListener('click', () => { $('#sheet-plan').hidden = true; });
+
+    $('#inv-card').addEventListener('toggle', () => { if ($('#inv-card').open) loadInventory(); });
+
     /* Coordinates */
     $$('[data-fill]').forEach((b) => b.addEventListener('click', () => fillCoords(b.dataset.fill)));
     ['ax', 'ay', 'az', 'bx', 'by', 'bz'].forEach((id) =>
@@ -443,6 +455,9 @@ function wire() {
 
     /* Dock */
     $('#stop').addEventListener('click', () => postJson('/api/job/stop', {}).catch(() => {}));
+    // No body: the server flips whichever way it is currently set.
+    $('#pause').addEventListener('click', () => postJson('/api/job/pause', {}).catch(
+        (e) => log(`could not pause: ${e.message}`, 'err')));
     $('#dock-toggle').addEventListener('click', () => $('#dock').classList.toggle('is-collapsed'));
 
     $('#shot').addEventListener('click', async () => {
@@ -482,6 +497,107 @@ function wire() {
             log('could not copy — select the log text manually', 'err');
         }
     });
+}
+
+/* ── Inventory ───────────────────────────────────────────────── */
+
+async function loadInventory() {
+    try {
+        const data = await getJson('/api/inventory');
+        const ul = $('#inv-list');
+        ul.textContent = '';
+        $('#inv-empty').hidden = data.items.length > 0;
+        $('#inv-summary').textContent =
+            `${data.items.length} kind(s) · ${data.free} free slot(s)`;
+
+        for (const it of data.items) {
+            const li = document.createElement('li');
+            li.classList.toggle('is-equipped', it.equipped);
+            li.title = it.equipped ? `${it.id} (in hand)` : it.id;
+
+            const img = document.createElement('img');
+            img.src = iconUrl(it.id);
+            img.alt = '';
+            img.loading = 'lazy';
+            img.addEventListener('error', () => { img.style.visibility = 'hidden'; });
+
+            const name = document.createElement('span');
+            name.className = 'inv-name';
+            name.textContent = it.name;
+
+            const count = document.createElement('span');
+            count.className = 'inv-count';
+            count.textContent = `×${it.count}`;
+
+            li.append(img, name, count);
+
+            // Durability is only meaningful for tools; -1 means it does not wear out.
+            if (it.durability >= 0) {
+                const dur = document.createElement('span');
+                dur.className = 'inv-dur';
+                // The tool belt treats anything under 10% as already gone.
+                dur.classList.toggle('is-low', it.durability < 10);
+                dur.textContent = `${it.durability}%`;
+                li.append(dur);
+            }
+            ul.append(li);
+        }
+    } catch (e) {
+        log(`could not read the inventory: ${e.message}`, 'err');
+    }
+}
+
+/* ── Plan preview ────────────────────────────────────────────── */
+
+async function previewPlan() {
+    const item = state.selected;
+    if (!item) return;
+    const box = $('#sheet-plan');
+    const list = $('#plan-steps');
+    list.textContent = '';
+    box.hidden = false;
+
+    const waiting = document.createElement('li');
+    waiting.textContent = 'working it out…';
+    list.append(waiting);
+
+    try {
+        const r = await getJson(
+            `/api/plan?item=${encodeURIComponent(item.id)}&count=${sheetCount()}`);
+        list.textContent = '';
+
+        if (!r.ok) {
+            const li = document.createElement('li');
+            li.className = 'plan-err';
+            li.dataset.kind = 'no';
+            li.textContent = r.error;
+            list.append(li);
+            return;
+        }
+        if (r.steps.length === 0) {
+            const li = document.createElement('li');
+            li.dataset.kind = '—';
+            li.textContent = 'nothing to do';
+            list.append(li);
+            return;
+        }
+        for (const step of r.steps) {
+            const li = document.createElement('li');
+            li.className = `k-${step.kind}`;
+            li.dataset.kind = step.kind;
+            // The server already renders each step as a sentence; reuse it rather than
+            // rebuilding the wording here and letting the two drift apart.
+            li.textContent = step.text.replace(new RegExp(`^${step.kind}\s+`, 'i'), '');
+            list.append(li);
+        }
+    } catch (e) {
+        list.textContent = '';
+        const li = document.createElement('li');
+        li.className = 'plan-err';
+        li.dataset.kind = 'err';
+        li.textContent = e.message;
+        list.append(li);
+    }
 }
 
 /* ── Queue ───────────────────────────────────────────────────── */
@@ -650,12 +766,25 @@ async function loadSettings() {
         $$('[data-setting]').forEach((box) => {
             box.checked = Boolean(s[box.dataset.setting]);
         });
+        $('#set-deposit').value = s.depositAtFreeSlots ?? 3;
     } catch (e) {
         log(`could not load settings: ${e.message}`, 'err');
     }
 }
 
 function wireSettings() {
+    const deposit = $('#set-deposit');
+    deposit.addEventListener('change', async () => {
+        const value = Math.max(0, Math.min(30, Number(deposit.value) || 0));
+        deposit.value = value;
+        try {
+            await postJson('/api/settings', { depositAtFreeSlots: String(value) });
+            log(`will unload with ${value} slot(s) left`, 'ok');
+        } catch (e) {
+            log(`could not save setting: ${e.message}`, 'err');
+        }
+    });
+
     $$('[data-setting]').forEach((box) => {
         box.addEventListener('change', async () => {
             try {
