@@ -1,0 +1,101 @@
+MC CONTROLER — building from source (PowerShell)
+================================================
+
+Only needed if you want to change the mod. To just play, follow INSTALL.txt.
+
+
+ONE-TIME SETUP
+--------------
+
+Minecraft 26.2 needs Java 25 — Java 21 will not work. Gradle comes from the
+wrapper, so there is nothing to install for it.
+
+    winget install --id Microsoft.OpenJDK.25 --source winget --accept-package-agreements
+
+Point JAVA_HOME at it in every shell you build from (adjust if the version differs):
+
+    $env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-25.0.4.7-hotspot"
+
+To set it permanently instead:
+
+    [Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Microsoft\jdk-25.0.4.7-hotspot", "User")
+
+
+BARITONE
+--------
+
+There is no published Baritone release for 26.2, so it is built from source off the
+upstream 26.2 branch. From the project folder:
+
+    git clone --depth 1 --branch 26.2 https://github.com/cabaletta/baritone.git external\baritone
+    Push-Location external\baritone
+    .\gradlew.bat :neoforge:build
+    Pop-Location
+
+    New-Item -ItemType Directory -Force libs | Out-Null
+    Copy-Item external\baritone\dist\baritone-api-neoforge-*.jar libs\ -Force
+
+Copy the *api* jar, not "standalone" — standalone is fully obfuscated and does not
+expose the API this mod calls.
+
+Do NOT pass -Pmod_version=1.18.0 to Baritone's build. PowerShell splits it at the
+dot and Gradle reads ".18.0" as a task name. The version is already in its
+gradle.properties.
+
+
+BUILD THE MOD
+-------------
+
+    .\gradlew.bat build
+
+The jar lands in build\libs\mccontroler-1.1.jar
+
+Just the mod jar, for a machine that already has Baritone:
+
+    .\gradlew.bat exportJar
+
+    -> export\mccontroler-1.1.jar
+
+The mod plus Baritone plus these notes, as one zip:
+
+    .\gradlew.bat packageMod
+
+    -> build\distributions\MCControler-1.1.zip
+
+The version comes from mod_version in gradle.properties; change it there and every
+file name follows.
+
+
+RUN IT
+------
+
+Dev client, straight to the title screen:
+
+    .\gradlew.bat runClient
+
+Dev client that boots directly into a save, skipping the menus:
+
+    .\gradlew.bat runClientWorld
+    .\gradlew.bat runClientWorld -Pworld="My World"
+
+The save name is the FOLDER name under run\saves. Baritone is put on the dev run
+classpath automatically; do not copy it into run\mods, or it loads in a separate
+module layer and the mod cannot link against it.
+
+Panel: http://127.0.0.1:7654/
+
+
+HANDY
+-----
+
+Just compile, no run:            .\gradlew.bat compileJava
+Regenerate the game data tables: powershell -File scripts\extract-recipes.ps1
+Stop a stuck dev client:
+    Get-CimInstance Win32_Process -Filter "Name='java.exe'" |
+        Where-Object { $_.CommandLine -match "fml.modFolders" } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+
+The data tables (recipes, drops, worldgen, self-drops, tool requirements) are
+extracted from the Minecraft server jar and committed under src\main\resources.
+Regenerate them after a Minecraft version bump; the script needs the server jar,
+which ModDevGradle downloads during the first build.

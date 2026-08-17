@@ -1,0 +1,22 @@
+# Build output
+build/
+.gradle/
+dist/
+
+# Dev client working directory: world saves, logs, screenshots and session state.
+# Never commit this — it also holds the launcher's auth cache.
+run/
+
+# Baritone's source clone, created by the build steps in dist-files/BUILD.txt.
+external/
+
+# Editor / tooling local state
+.vscode/
+.claude/
+*.iml
+.idea/
+
+# Baritone ships two builds and only the "api" one is usable here: "standalone" is fully
+# ProGuard-obfuscated and does not contain baritone.api.BaritoneAPI at all. Keeping it out of
+# the repo removes the chance of installing the wrong jar.
+libs/baritone-standalone-*.jar

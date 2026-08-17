@@ -1,0 +1,35 @@
+license="${mod_license}"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+description='''
+Client-side automation console for Minecraft. Opens a local web control panel
+where you pick a block and your player goes and gets it: mining, crafting,
+tree farming, area excavation and schematic building, driven by Baritone.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="[${neo_version},)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="CLIENT"
+
+# Baritone supplies pathfinding, mining and building. Required at runtime.
+# The id really is "baritoe" — a typo in Baritone's own neoforge.mods.toml, not one of ours.
+# Do not "correct" it; the dependency stops resolving.
+[[dependencies.${mod_id}]]
+    modId="baritoe"
+    type="required"
+    versionRange="[1.18,)"
+    ordering="AFTER"
+    side="CLIENT"

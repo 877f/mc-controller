@@ -1,0 +1,154 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.143'
+    id 'idea'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Mojang ships Java 25 to end users in 26.2, so mods must target Java 25.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+repositories {
+    mavenCentral()
+}
+
+neoForge {
+    version = project.neo_version
+
+    runs {
+        client {
+            client()
+        }
+
+        // Boots straight into a save via Quick Play, so a test run needs no clicking through
+        // the menus. The argument is the save FOLDER name under run/saves, not the display name.
+        clientWorld {
+            client()
+            programArguments.addAll '--quickPlaySingleplayer', providers
+                    .gradleProperty('world')
+                    .getOrElse('New World (1)')
+        }
+
+        configureEach {
+            logLevel = org.slf4j.event.Level.INFO
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+// 'localRuntime' puts a jar on the dev-run classpath without publishing a dependency on it.
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+    // Baritone is built from source into ./libs (see SETUP.md).
+    //
+    // Use the *api* jar for both compile and runtime. Baritone ships two builds: 'standalone'
+    // is fully ProGuard-obfuscated and does not contain baritone.api.BaritoneAPI at all, while
+    // 'api' leaves the baritone.api package readable precisely so other mods can link to it.
+    // Running against standalone compiles fine and then dies with NoClassDefFoundError.
+    compileOnly fileTree(dir: "${rootDir}/libs", include: ['baritone-api-*.jar'])
+    localRuntime fileTree(dir: "${rootDir}/libs", include: ['baritone-api-*.jar'])
+}
+
+// Collects everything that has to go into a real .minecraft/mods folder, so the mod can be
+// tested on another machine without a dev environment.
+tasks.register("bundle", Copy) {
+    dependsOn tasks.named("jar")
+    from tasks.named("jar")
+    // The api jar, not standalone — standalone has no baritone.api.BaritoneAPI (see SETUP.md).
+    from fileTree(dir: "${rootDir}/libs", include: ['baritone-api-*.jar'])
+    into layout.projectDirectory.dir("dist")
+
+    doLast {
+        println ""
+        println "Bundle ready: ${layout.projectDirectory.dir("dist").asFile}"
+        println "Copy both jars into %APPDATA%\\.minecraft\\mods\\ on a 26.2 + NeoForge ${neo_version} install."
+    }
+}
+
+// Just the mod jar, on its own, for updating a machine that already has Baritone installed.
+tasks.register("exportJar", Copy) {
+    dependsOn tasks.named("jar")
+    from tasks.named("jar")
+    into layout.projectDirectory.dir("export")
+
+    // Resolved now, not in doLast: the configuration cache forbids touching project properties
+    // or `layout` during execution.
+    var exportedPath = layout.projectDirectory
+            .file("export/${mod_id}-${mod_version}.jar").asFile.absolutePath
+    doLast {
+        println ""
+        println "Mod jar only:"
+        println "  ${exportedPath}"
+        println ""
+        println "Drop it in .minecraft/mods/, replacing the old one."
+        println "Baritone is unchanged, so leave baritone-api-neoforge-*.jar as it is."
+    }
+}
+
+// One zip holding both jars and the notes — the thing to actually carry to another machine.
+tasks.register("packageMod", Zip) {
+    dependsOn tasks.named("jar")
+    archiveBaseName = "MCControler"
+    archiveVersion = mod_version
+    destinationDirectory = layout.buildDirectory.dir("distributions")
+
+    from(tasks.named("jar")) { into "mods" }
+    from(fileTree(dir: "${rootDir}/libs", include: ['baritone-api-*.jar'])) { into "mods" }
+    from("${rootDir}/dist-files")
+
+    // Captured now, not in doLast: the configuration cache forbids reading project
+    // properties during execution.
+    var neoVersion = neo_version
+    doLast {
+        println ""
+        println "Package ready:"
+        println "  ${archiveFile.get().asFile}"
+        println ""
+        println "On the other machine: unzip, then copy the two jars from mods/ into"
+        println "%APPDATA%\\.minecraft\\mods\\ on a Minecraft 26.2 + NeoForge ${neoVersion} install."
+    }
+}
+
+// Expands ${...} properties into the mod metadata template.
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version      : minecraft_version,
+            minecraft_version_range: minecraft_version_range,
+            neo_version            : neo_version,
+            mod_id                 : mod_id,
+            mod_name               : mod_name,
+            mod_license            : mod_license,
+            mod_version            : mod_version,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

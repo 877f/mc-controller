@@ -1,0 +1,102 @@
+MC CONTROLER — install guide
+============================
+
+A client-side mod for Minecraft Java 26.2. It opens a web control panel on your own
+machine where you pick a block and your player goes and gets it: mining, crafting,
+smelting, tree farming, area excavation and building.
+
+
+WHAT YOU NEED
+-------------
+
+1. Minecraft Java Edition 26.2
+2. NeoForge 26.2.0.59 (or newer 26.2 build)  -  https://neoforged.net/
+
+Java is supplied by the Minecraft launcher; you do not need to install it yourself.
+
+
+INSTALL
+-------
+
+1. Install NeoForge 26.2.0.59 and run it once, so the profile and folders exist.
+
+2. Copy BOTH jars from this zip's mods/ folder into your mods folder:
+
+       mccontroler-1.1.jar
+       baritone-api-neoforge-1.18.0.jar
+
+   Windows:  %APPDATA%\.minecraft\mods\
+   macOS:    ~/Library/Application Support/minecraft/mods/
+   Linux:    ~/.minecraft/mods/
+
+   Both jars are required. Baritone does the pathfinding and block breaking; this mod
+   is the planner and the control panel on top of it.
+
+   IMPORTANT: it must be the "baritone-api" jar, not "baritone-standalone". The
+   standalone build is fully obfuscated and does not expose the API this mod calls,
+   so the game will load and then fail the moment you start a job.
+
+3. Launch Minecraft with the NeoForge profile and load a world.
+
+4. Open this in any browser on the same machine:
+
+       http://127.0.0.1:7654/
+
+   The exact address is printed in the game log at startup:
+       [MC Controler] control panel ready at http://127.0.0.1:7654/
+
+   If port 7654 is taken it walks upward to 7655, 7656 and so on, so check the log.
+
+
+USING IT
+--------
+
+Gather    Search every block and item, pick one, choose a count. It works out the
+          whole chain — mining, smelting, crafting, and the tools needed along the
+          way — and does it. Starting from nothing it will fell trees, make a
+          wooden pickaxe, mine cobblestone, build a furnace and work up to iron.
+
+Trees     Fell and replant continuously, or stop after a target number of logs.
+
+Excavate  Clear everything between two corners.
+
+Kits      Queue several items at once and save the list by name.
+
+Places    Save named spots and send the bot to them. Also "go to the surface" and
+          "go to nearest portal". If the bot dies, the spot is saved as "death" so
+          you can send it back for your things.
+
+Build     Solid, hollow or walls-only boxes from any block. If it lacks the
+          material it gathers it first.
+
+Settings  Which materials to prefer or never use, and which items may be burned as
+          fuel. Workstations, tools and boats are protected by default.
+
+
+NOTES
+-----
+
+- The panel listens on 127.0.0.1 only. Nothing else on your network can reach it.
+
+- Settings live in .minecraft/mccontroler/ (waypoints, kits, fuel, materials, home
+  chest). Plain text, safe to edit or delete.
+
+- Singleplayer and your own servers. On public servers, bots are usually against
+  the rules — that is your call, not mine.
+
+- The bot leaves crafting tables and furnaces standing where it used them, and
+  reuses them next time rather than carrying them around.
+
+- If the game crashes on startup with "Missing uniform Globals", open
+  .minecraft/config/fml.toml and set:
+
+      earlyWindowControl = false
+
+  NeoForge's early loading screen leaves the OpenGL context in a state some drivers
+  cannot recover from. This is a NeoForge/driver issue, not this mod.
+
+
+LICENCE
+-------
+
+LGPL-3.0-only, because it links against Baritone, which is LGPL-3.0-only.
