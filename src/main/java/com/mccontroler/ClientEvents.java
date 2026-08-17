@@ -3,6 +3,7 @@ package com.mccontroler;
 import com.mccontroler.BotSettings;
 import com.mccontroler.bot.BaritoneBridge;
 import com.mccontroler.bot.Survival;
+import com.mccontroler.inv.Screens;
 import com.mccontroler.job.JobManager;
 import com.mccontroler.place.Waypoints;
 import com.mccontroler.web.EventStream;
@@ -29,6 +30,9 @@ public final class ClientEvents {
         handleDeath();
         Survival.tick();
         JobManager.get().tick();
+        // Runs after the queue so a station screen that arrived late — the job that asked for it
+        // having already finished, failed or been stopped — cannot strand the player's mouse.
+        Screens.tick();
     }
 
     /**

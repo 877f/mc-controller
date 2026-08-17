@@ -47,7 +47,8 @@ async function pollStatus() {
         if (s.inWorld) {
             el.classList.add('status--on');
             el.classList.remove('status--off');
-            $('#status-text').textContent = `${s.player} · ${s.x} ${s.y} ${s.z} · ${s.dimension.replace('minecraft:', '')}`;
+            $('#status-text').textContent =
+                `${s.player} · ${s.x} ${s.y} ${s.z} · ${s.dimension.replace('minecraft:', '')}`;
         } else {
             el.classList.remove('status--on');
             el.classList.add('status--off');
@@ -69,7 +70,7 @@ function renderGrid() {
     const q = $('#search').value.trim().toLowerCase();
     const blocksOnly = $('#blocks-only').checked;
 
-    let matches = state.items.filter((it) => {
+    const matches = state.items.filter((it) => {
         if (blocksOnly && !it.block) return false;
         if (!q) return true;
         return it.name.toLowerCase().includes(q) || it.id.includes(q);
@@ -109,6 +110,7 @@ function openSheet(item) {
     $('#sheet-id').textContent = item.id;
     $('#sheet').hidden = false;
     $('#sheet-count').focus();
+    $('#sheet-count').select();
 }
 
 function closeSheet() {
@@ -116,12 +118,15 @@ function closeSheet() {
     state.selected = null;
 }
 
+function sheetCount() {
+    return Math.max(1, Number($('#sheet-count').value) || 1);
+}
+
 /* ── Jobs ────────────────────────────────────────────────────── */
 
 async function submitJob(payload) {
     try {
         await postJson('/api/job', payload);
-        log(`queued: ${payload.type}`, 'ok');
     } catch (e) {
         log(`failed: ${e.message}`, 'err');
     }
@@ -178,7 +183,7 @@ function openEventStream() {
     });
 }
 
-/* ── Wiring ──────────────────────────────────────────────────── */
+/* ── Coordinates ─────────────────────────────────────────────── */
 
 function fillCoords(prefix) {
     const s = state.lastStatus;
@@ -190,6 +195,7 @@ function fillCoords(prefix) {
     $(`#${prefix}y`).value = s.y;
     $(`#${prefix}z`).value = s.z;
     updateExcavateSize();
+    updateBuildSize();
 }
 
 function coords(prefix) {
@@ -201,25 +207,29 @@ function coords(prefix) {
     return (c.x === null || c.y === null || c.z === null) ? null : c;
 }
 
-function updateTreeNote() {
-    const count = Math.max(0, Number($('#tree-count').value) || 0);
-    const replants = $('#tree-mode').value === 'loop';
-    $('#tree-count-note').textContent = count === 0
-        ? `0 means keep going until you press Stop${replants ? ', replanting as it goes' : ''}.`
-        : `Stops once ${count} more logs are collected${replants ? ', replanting as it goes' : ''}.`;
+function span(a, b) {
+    return {
+        dx: Math.abs(a.x - b.x) + 1,
+        dy: Math.abs(a.y - b.y) + 1,
+        dz: Math.abs(a.z - b.z) + 1,
+    };
+}
+
+function updateExcavateSize() {
+    const a = coords('a');
+    const b = coords('b');
+    const out = $('#excavate-size');
+    if (!a || !b) { out.textContent = ''; return; }
+    const { dx, dy, dz } = span(a, b);
+    out.textContent = `${dx} × ${dy} × ${dz} = ${(dx * dy * dz).toLocaleString()} blocks`;
 }
 
 function updateBuildSize() {
     const a = coords('ba');
     const b = coords('bb');
     const out = $('#build-size');
-    if (!a || !b) {
-        out.textContent = '';
-        return;
-    }
-    const dx = Math.abs(a.x - b.x) + 1;
-    const dy = Math.abs(a.y - b.y) + 1;
-    const dz = Math.abs(a.z - b.z) + 1;
+    if (!a || !b) { out.textContent = ''; return; }
+    const { dx, dy, dz } = span(a, b);
 
     // Mirrors the server-side estimate so the block count shown matches what it gathers.
     const shape = $('#build-shape').value;
@@ -232,29 +242,43 @@ function updateBuildSize() {
     out.textContent = `${dx} × ${dy} × ${dz} — about ${blocks.toLocaleString()} blocks needed`;
 }
 
-function updateExcavateSize() {
-    const a = coords('a');
-    const b = coords('b');
-    const out = $('#excavate-size');
-    if (!a || !b) {
-        out.textContent = '';
-        return;
-    }
-    const dx = Math.abs(a.x - b.x) + 1;
-    const dy = Math.abs(a.y - b.y) + 1;
-    const dz = Math.abs(a.z - b.z) + 1;
-    out.textContent = `${dx} × ${dy} × ${dz} = ${(dx * dy * dz).toLocaleString()} blocks`;
+function updateTreeNote() {
+    const count = Math.max(0, Number($('#tree-count').value) || 0);
+    const replants = $('#tree-mode').value === 'loop';
+    $('#tree-count-note').textContent = count === 0
+        ? `0 means keep going until you press Stop${replants ? ', replanting as it goes' : ''}.`
+        : `Stops once ${count} more logs are collected${replants ? ', replanting as it goes' : ''}.`;
 }
 
+/* ── Wiring ──────────────────────────────────────────────────── */
+
 function wire() {
+    // Tabs, and the per-tab data each one needs fresh.
     $$('.tab').forEach((tab) => tab.addEventListener('click', () => {
         $$('.tab').forEach((t) => t.classList.toggle('is-active', t === tab));
         $$('.panel').forEach((p) => p.classList.toggle('is-active', p.dataset.panel === tab.dataset.tab));
+
+        if (tab.dataset.tab === 'places') {
+            loadChest();
+            loadStations();
+            loadWaypoints();
+        } else if (tab.dataset.tab === 'settings') {
+            loadSettings();
+            loadMaterials();
+            loadFuels();
+        }
+    }));
+
+    // Sub-nav inside Tasks.
+    $$('.seg').forEach((seg) => seg.addEventListener('click', () => {
+        $$('.seg').forEach((s) => s.classList.toggle('is-active', s === seg));
+        $$('.sub').forEach((s) => s.classList.toggle('is-active', s.dataset.sub === seg.dataset.sub));
     }));
 
     $('#search').addEventListener('input', renderGrid);
     $('#blocks-only').addEventListener('change', renderGrid);
 
+    /* Order sheet */
     $('#sheet-cancel').addEventListener('click', closeSheet);
     $('#sheet').addEventListener('click', (e) => { if (e.target === $('#sheet')) closeSheet(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSheet(); });
@@ -266,18 +290,35 @@ function wire() {
     $('#sheet-go').addEventListener('click', async () => {
         const item = state.selected;
         if (!item) return;
-        const count = Math.max(1, Number($('#sheet-count').value) || 1);
+        const count = sheetCount();
         closeSheet();
         await submitJob({ type: 'acquire', item: item.id, count });
     });
 
+    // Straight from the picker into the batch list, so building a list does not mean
+    // typing ids by hand.
+    $('#sheet-add').addEventListener('click', () => {
+        const item = state.selected;
+        if (!item) return;
+        addKit(item.id, sheetCount());
+        closeSheet();
+        $('#list-card').open = true;
+        loadKits();
+    });
+
+    $('#sheet-count').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') $('#sheet-go').click();
+    });
+
+    /* Coordinates */
     $$('[data-fill]').forEach((b) => b.addEventListener('click', () => fillCoords(b.dataset.fill)));
     ['ax', 'ay', 'az', 'bx', 'by', 'bz'].forEach((id) =>
         $(`#${id}`).addEventListener('input', updateExcavateSize));
+    ['bax', 'bay', 'baz', 'bbx', 'bby', 'bbz'].forEach((id) =>
+        $(`#${id}`).addEventListener('input', updateBuildSize));
+    $('#build-shape').addEventListener('change', updateBuildSize);
 
-    // The target applies to both modes now, so the note explains what 0 means rather than
-    // hiding the field — a visible box the mode silently ignored was why a "one-shot" run
-    // kept farming forever.
+    /* Trees */
     $('#tree-count').addEventListener('input', updateTreeNote);
     $('#tree-mode').addEventListener('change', updateTreeNote);
     updateTreeNote();
@@ -289,10 +330,18 @@ function wire() {
         count: Math.max(0, Number($('#tree-count').value) || 0),
     }));
 
-    ['bax', 'bay', 'baz', 'bbx', 'bby', 'bbz', 'build-shape'].forEach((id) =>
-        $(`#${id}`).addEventListener('input', updateBuildSize));
-    $('#build-shape').addEventListener('change', updateBuildSize);
+    /* Excavate */
+    $('[data-job="excavate"]').addEventListener('click', () => {
+        const a = coords('a');
+        const b = coords('b');
+        if (!a || !b) {
+            log('excavation needs both corners', 'err');
+            return;
+        }
+        submitJob({ type: 'excavate', ax: a.x, ay: a.y, az: a.z, bx: b.x, by: b.y, bz: b.z });
+    });
 
+    /* Build */
     $('[data-job="buildbox"]').addEventListener('click', () => {
         const a = coords('ba');
         const b = coords('bb');
@@ -314,24 +363,87 @@ function wire() {
         });
     });
 
-    $('[data-job="excavate"]').addEventListener('click', () => {
-        const a = coords('a');
-        const b = coords('b');
-        if (!a || !b) {
-            log('excavation needs both corners', 'err');
-            return;
-        }
-        submitJob({
-            type: 'excavate',
-            ax: a.x, ay: a.y, az: a.z,
-            bx: b.x, by: b.y, bz: b.z,
-        });
-    });
-
-    $('#stop').addEventListener('click', () => postJson('/api/job/stop', {}).catch(() => {}));
-
+    /* Places */
     $('[data-job="surface"]').addEventListener('click', () => submitJob({ type: 'surface' }));
     $('[data-job="portal"]').addEventListener('click', () => submitJob({ type: 'portal' }));
+
+    $('#chest-set').addEventListener('click', async () => {
+        try {
+            const r = await postJson('/api/chest', {});
+            log(`home chest set at ${r.at}`, 'ok');
+            loadChest();
+        } catch (e) {
+            log(`could not set home chest: ${e.message}`, 'err');
+        }
+    });
+    $('#chest-go').addEventListener('click', () => submitJob({ type: 'deposit' }));
+
+    $$('[data-assign]').forEach((b) => b.addEventListener('click', async () => {
+        try {
+            const r = await postJson('/api/stations', { kind: b.dataset.assign });
+            log(`${r.kind} assigned at ${r.at}`, 'ok');
+            loadStations();
+        } catch (e) {
+            log(`could not assign: ${e.message}`, 'err');
+        }
+    }));
+
+    $$('[data-clear]').forEach((b) => b.addEventListener('click', async () => {
+        try {
+            await postJson('/api/stations', { kind: b.dataset.clear, clear: 'true' });
+            log(`${b.dataset.clear} assignment cleared`, 'ok');
+            loadStations();
+        } catch (e) {
+            log(`could not clear: ${e.message}`, 'err');
+        }
+    }));
+
+    $('#wp-save').addEventListener('click', saveWaypoint);
+    $('#wp-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveWaypoint(); });
+
+    /* Lists / kits */
+    $('#kit-add').addEventListener('click', addKitLine);
+    $('#kit-item').addEventListener('keydown', (e) => { if (e.key === 'Enter') addKitLine(); });
+    $('#list-card').addEventListener('toggle', () => { if ($('#list-card').open) loadKits(); });
+
+    $('#kit-run').addEventListener('click', async () => {
+        if (state.kit.length === 0) {
+            log('the list is empty', 'err');
+            return;
+        }
+        try {
+            const r = await postJson('/api/job/batch', { items: kitSpec() });
+            log(`queued ${r.queued} item(s)`, 'ok');
+        } catch (e) {
+            log(`could not queue the list: ${e.message}`, 'err');
+        }
+    });
+
+    $('#kit-save').addEventListener('click', async () => {
+        const name = $('#kit-name').value.trim();
+        if (!name || state.kit.length === 0) {
+            log('give the list a name and at least one item', 'err');
+            return;
+        }
+        try {
+            await postJson('/api/kits', { name, items: kitSpec() });
+            log(`saved list "${name}"`, 'ok');
+            $('#kit-name').value = '';
+            loadKits();
+        } catch (e) {
+            log(`could not save list: ${e.message}`, 'err');
+        }
+    });
+
+    /* Settings */
+    wireSettings();
+    $('#mat-save').addEventListener('click', saveMaterials);
+    $('#fuel-only-have').addEventListener('change', renderFuels);
+    $('#fuel-save').addEventListener('click', saveFuels);
+
+    /* Dock */
+    $('#stop').addEventListener('click', () => postJson('/api/job/stop', {}).catch(() => {}));
+    $('#dock-toggle').addEventListener('click', () => $('#dock').classList.toggle('is-collapsed'));
 
     $('#shot').addEventListener('click', async () => {
         try {
@@ -369,90 +481,6 @@ function wire() {
             // Clipboard needs a secure context; loopback usually counts, but not always.
             log('could not copy — select the log text manually', 'err');
         }
-    });
-
-    $('#wp-save').addEventListener('click', saveWaypoint);
-    $('#wp-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveWaypoint(); });
-
-    $('#kit-add').addEventListener('click', addKitLine);
-    $('#kit-item').addEventListener('keydown', (e) => { if (e.key === 'Enter') addKitLine(); });
-
-    $('#kit-run').addEventListener('click', async () => {
-        if (state.kit.length === 0) {
-            log('the list is empty', 'err');
-            return;
-        }
-        try {
-            const r = await postJson('/api/job/batch', { items: kitSpec() });
-            log(`queued ${r.queued} item(s)`, 'ok');
-        } catch (e) {
-            log(`could not queue the list: ${e.message}`, 'err');
-        }
-    });
-
-    $('#kit-save').addEventListener('click', async () => {
-        const name = $('#kit-name').value.trim();
-        if (!name || state.kit.length === 0) {
-            log('give the kit a name and at least one item', 'err');
-            return;
-        }
-        try {
-            await postJson('/api/kits', { name, items: kitSpec() });
-            log(`saved kit "${name}"`, 'ok');
-            $('#kit-name').value = '';
-            loadKits();
-        } catch (e) {
-            log(`could not save kit: ${e.message}`, 'err');
-        }
-    });
-
-    $('.tab[data-tab="kits"]').addEventListener('click', loadKits);
-
-    $('#chest-set').addEventListener('click', async () => {
-        try {
-            const r = await postJson('/api/chest', {});
-            log(`home chest set at ${r.at}`, 'ok');
-            loadChest();
-        } catch (e) {
-            log(`could not set home chest: ${e.message}`, 'err');
-        }
-    });
-    $('#chest-go').addEventListener('click', () => submitJob({ type: 'deposit' }));
-
-    $$('[data-assign]').forEach((b) => b.addEventListener('click', async () => {
-        try {
-            const r = await postJson('/api/stations', { kind: b.dataset.assign });
-            log(`${r.kind} assigned at ${r.at}`, 'ok');
-            loadStations();
-        } catch (e) {
-            log(`could not assign: ${e.message}`, 'err');
-        }
-    }));
-
-    $$('[data-clear]').forEach((b) => b.addEventListener('click', async () => {
-        try {
-            await postJson('/api/stations', { kind: b.dataset.clear, clear: 'true' });
-            log(`${b.dataset.clear} assignment cleared`, 'ok');
-            loadStations();
-        } catch (e) {
-            log(`could not clear: ${e.message}`, 'err');
-        }
-    }));
-
-    $('.tab[data-tab="places"]').addEventListener('click', () => {
-        loadChest();
-        loadStations();
-    });
-
-    $('#fuel-only-have').addEventListener('change', renderFuels);
-    $('#fuel-save').addEventListener('click', saveFuels);
-    $('#mat-save').addEventListener('click', saveMaterials);
-    // The catalogue includes how much you are carrying, so refresh it when the tab is opened.
-    wireSettings();
-    $('.tab[data-tab="fuel"]').addEventListener('click', () => {
-        loadFuels();
-        loadMaterials();
-        loadSettings();
     });
 }
 
@@ -495,7 +523,7 @@ async function pollQueue() {
     }
 }
 
-/* ── Kits ────────────────────────────────────────────────────── */
+/* ── Lists / kits ────────────────────────────────────────────── */
 
 function renderKitLines() {
     const ul = $('#kit-lines');
@@ -506,15 +534,15 @@ function renderKitLines() {
         const li = document.createElement('li');
 
         const name = document.createElement('span');
-        name.className = 'wp-name';
+        name.className = 'r-name';
         name.textContent = line.item.replace('minecraft:', '');
 
         const count = document.createElement('span');
-        count.className = 'wp-pos';
+        count.className = 'r-meta';
         count.textContent = `× ${line.count}`;
 
         const remove = document.createElement('button');
-        remove.className = 'ghost';
+        remove.className = 'btn btn--sm';
         remove.textContent = 'Remove';
         remove.addEventListener('click', () => {
             state.kit.splice(index, 1);
@@ -526,23 +554,25 @@ function renderKitLines() {
     });
 }
 
-function addKitLine() {
-    const input = $('#kit-item');
-    const raw = input.value.trim();
-    if (!raw) return;
-    const item = raw.includes(':') ? raw : `minecraft:${raw}`;
-    const count = Math.max(1, Number($('#kit-count').value) || 1);
-
-    // Adding the same item twice tops up the existing line rather than duplicating it.
+/** Adding the same item twice tops up the existing line rather than duplicating it. */
+function addKit(item, count) {
     const existing = state.kit.find((l) => l.item === item);
     if (existing) {
         existing.count += count;
     } else {
         state.kit.push({ item, count });
     }
+    renderKitLines();
+}
+
+function addKitLine() {
+    const input = $('#kit-item');
+    const raw = input.value.trim();
+    if (!raw) return;
+    addKit(raw.includes(':') ? raw : `minecraft:${raw}`,
+           Math.max(1, Number($('#kit-count').value) || 1));
     input.value = '';
     input.focus();
-    renderKitLines();
 }
 
 function kitSpec() {
@@ -560,27 +590,28 @@ async function loadKits() {
             const li = document.createElement('li');
 
             const name = document.createElement('span');
-            name.className = 'wp-name';
+            name.className = 'r-name';
             name.textContent = kit.name;
 
             const summary = document.createElement('span');
-            summary.className = 'wp-pos';
+            summary.className = 'r-meta';
             summary.textContent = kit.items.replace(/minecraft:/g, '');
+            summary.title = kit.items;
 
             const run = document.createElement('button');
-            run.className = 'go';
+            run.className = 'btn btn--sm btn--go';
             run.textContent = 'Run';
             run.addEventListener('click', async () => {
                 try {
                     const r = await postJson('/api/job/batch', { kit: kit.name });
                     log(`queued ${r.queued} item(s) from "${kit.name}"`, 'ok');
                 } catch (e) {
-                    log(`could not run kit: ${e.message}`, 'err');
+                    log(`could not run list: ${e.message}`, 'err');
                 }
             });
 
             const load = document.createElement('button');
-            load.className = 'ghost';
+            load.className = 'btn btn--sm';
             load.textContent = 'Edit';
             load.addEventListener('click', () => {
                 state.kit = kit.items.split(',').filter(Boolean).map((tok) => {
@@ -592,7 +623,7 @@ async function loadKits() {
             });
 
             const del = document.createElement('button');
-            del.className = 'ghost';
+            del.className = 'btn btn--sm';
             del.textContent = 'Delete';
             del.addEventListener('click', async () => {
                 try {
@@ -607,7 +638,7 @@ async function loadKits() {
             ul.append(li);
         }
     } catch (e) {
-        log(`could not load kits: ${e.message}`, 'err');
+        log(`could not load lists: ${e.message}`, 'err');
     }
 }
 
@@ -713,13 +744,13 @@ function renderFuels() {
 
         // Order in the list is the order the bot reaches for them.
         const up = document.createElement('button');
-        up.className = 'ghost fuel-move';
+        up.className = 'btn fuel-move';
         up.textContent = '↑';
         up.title = 'Use this sooner';
         up.addEventListener('click', () => moveFuel(fuel, -1));
 
         const down = document.createElement('button');
-        down.className = 'ghost fuel-move';
+        down.className = 'btn fuel-move';
         down.textContent = '↓';
         down.title = 'Use this later';
         down.addEventListener('click', () => moveFuel(fuel, 1));
@@ -794,20 +825,20 @@ function renderWaypoints(list) {
         const li = document.createElement('li');
 
         const name = document.createElement('span');
-        name.className = 'wp-name';
+        name.className = 'r-name';
         name.textContent = wp.name;
 
         const pos = document.createElement('span');
-        pos.className = 'wp-pos';
+        pos.className = 'r-meta';
         pos.textContent = `${wp.x} ${wp.y} ${wp.z} · ${wp.dimension.replace('minecraft:', '')}`;
 
         const go = document.createElement('button');
-        go.className = 'go';
+        go.className = 'btn btn--sm btn--go';
         go.textContent = 'Go';
         go.addEventListener('click', () => submitJob({ type: 'travel', name: wp.name }));
 
         const del = document.createElement('button');
-        del.className = 'ghost';
+        del.className = 'btn btn--sm';
         del.textContent = 'Delete';
         del.addEventListener('click', async () => {
             try {
@@ -840,34 +871,11 @@ async function saveWaypoint() {
     }
 }
 
-/* ── Boot ────────────────────────────────────────────────────── */
+/* ── Catalogue-driven inputs ─────────────────────────────────── */
 
-async function boot() {
-    wire();
-    openEventStream();
-    pollStatus();
-    setInterval(pollStatus, 1500);
-    pollQueue();
-    setInterval(pollQueue, 2000);
-    loadWaypoints();
-    loadChest();
-    loadStations();
-    loadSettings();
-
-    try {
-        const data = await getJson('/api/items');
-        state.items = data.items;
-        renderGrid();
-        populateLogTypes();
-        populateBuildBlocks();
-    } catch (e) {
-        log(`could not load the item list: ${e.message}`, 'err');
-    }
-}
-
-/** Autocomplete for the build block field, placeable items only. */
-function populateBuildBlocks() {
-    const list = $('#build-block-list');
+/** Autocomplete for the build and list fields, placeable items only. */
+function populateBlockList() {
+    const list = $('#block-list');
     for (const it of state.items.filter((i) => i.block)) {
         const opt = document.createElement('option');
         opt.value = it.id;
@@ -884,6 +892,32 @@ function populateLogTypes() {
         opt.value = it.id;
         opt.textContent = it.name;
         sel.append(opt);
+    }
+}
+
+/* ── Boot ────────────────────────────────────────────────────── */
+
+async function boot() {
+    wire();
+    openEventStream();
+    pollStatus();
+    setInterval(pollStatus, 1500);
+    pollQueue();
+    setInterval(pollQueue, 2000);
+    loadWaypoints();
+    loadChest();
+    loadStations();
+    loadSettings();
+    renderKitLines();
+
+    try {
+        const data = await getJson('/api/items');
+        state.items = data.items;
+        renderGrid();
+        populateLogTypes();
+        populateBlockList();
+    } catch (e) {
+        log(`could not load the item list: ${e.message}`, 'err');
     }
 }
 

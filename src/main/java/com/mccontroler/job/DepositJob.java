@@ -3,6 +3,7 @@ package com.mccontroler.job;
 import com.mccontroler.bot.BaritoneBridge;
 import com.mccontroler.inv.HomeChest;
 import com.mccontroler.inv.InventoryHelper;
+import com.mccontroler.inv.Screens;
 import com.mccontroler.web.EventStream;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -122,6 +123,9 @@ public final class DepositJob implements Job {
         }
         BlockHitResult hit = new BlockHitResult(
                 Vec3.atCenterOf(chest), Direction.UP, chest, false);
+        // The screen arrives a few ticks later, from the server. Flag it now so it still gets
+        // closed if this job ends before it lands.
+        Screens.expectOpen();
         mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
         return Job.State.RUNNING;
     }
@@ -157,7 +161,8 @@ public final class DepositJob implements Job {
             return Job.State.RUNNING;
         }
 
-        player.closeContainer();
+        // Closes the screen as well as the menu; closing only the menu leaves the mouse released.
+        Screens.closeAny();
         EventStream.log("deposited " + deposited + " stack(s) — "
                 + InventoryHelper.freeSlots() + " free slots", "ok");
         return Job.State.DONE;
@@ -166,10 +171,7 @@ public final class DepositJob implements Job {
     @Override
     public void cancel() {
         BaritoneBridge.stop();
-        var player = Minecraft.getInstance().player;
-        if (player != null && player.containerMenu instanceof ChestMenu) {
-            player.closeContainer();
-        }
+        Screens.closeAny();
     }
 
     @Override

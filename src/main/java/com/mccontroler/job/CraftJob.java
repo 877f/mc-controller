@@ -3,6 +3,7 @@ package com.mccontroler.job;
 import com.mccontroler.inv.BlockPlacer;
 import com.mccontroler.bot.BaritoneBridge;
 import com.mccontroler.inv.InventoryHelper;
+import com.mccontroler.inv.Screens;
 import com.mccontroler.inv.Stations;
 import com.mccontroler.plan.RecipeTable;
 import com.mccontroler.web.EventStream;
@@ -464,6 +465,9 @@ public final class CraftJob implements Job {
 
         BlockHitResult hit = new BlockHitResult(
                 Vec3.atCenterOf(tablePos), Direction.UP, tablePos, false);
+        // The screen arrives a few ticks later, from the server. Flag it now so it still gets
+        // closed if this job ends before it lands.
+        Screens.expectOpen();
         mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
         return Job.State.RUNNING;
     }
@@ -511,9 +515,8 @@ public final class CraftJob implements Job {
      * {@code findTableNearby} reuses it rather than crafting another.
      */
     private Job.State cleanup(LocalPlayer player, Job.State result) {
-        if (player.containerMenu instanceof CraftingMenu) {
-            player.closeContainer();
-        }
+        // Closes the screen as well as the menu; closing only the menu leaves the mouse released.
+        Screens.closeAny();
         if (placedTable && tablePos != null) {
             EventStream.log("left the crafting table at " + tablePos.toShortString() + " for next time");
         }

@@ -66,6 +66,32 @@ function Get-ResultCount($result) {
     return 1
 }
 
+# Re-reads a recipe whose pattern keys differ only in case, which ConvertFrom-Json cannot
+# represent. Returns an object shaped like the ConvertFrom-Json result so the parser below needs
+# no special case, with `key` swapped for a case-sensitive hashtable.
+Add-Type -AssemblyName System.Web.Extensions
+function ConvertTo-CaseSensitiveRecipe([string]$json) {
+    $ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+    try { $dict = $ser.DeserializeObject($json) } catch { return $null }
+    if (-not $dict.ContainsKey("key")) { return $null }
+
+    # Ordinal-keyed so "I" and "i" stay distinct.
+    $keyMap = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::Ordinal)
+    foreach ($k in $dict["key"].Keys) { $keyMap[$k] = $dict["key"][$k] }
+
+    $result = [PSCustomObject]@{ id = $dict["result"]["id"] }
+    if ($dict["result"].ContainsKey("count")) {
+        $result | Add-Member -NotePropertyName count -NotePropertyValue $dict["result"]["count"]
+    }
+
+    return [PSCustomObject]@{
+        type    = $dict["type"]
+        pattern = @($dict["pattern"])
+        key     = $keyMap
+        result  = $result
+    }
+}
+
 $lines = New-Object System.Collections.Generic.List[string]
 $skipped = @{}
 $entries = $zip.Entries | Where-Object { $_.FullName -match "^data/minecraft/recipe/.+\.json$" }
@@ -76,7 +102,16 @@ foreach ($entry in $entries) {
     $json = $reader.ReadToEnd()
     $reader.Close()
 
-    try { $r = $json | ConvertFrom-Json } catch { continue }
+    # ConvertFrom-Json builds a PSCustomObject, whose property names are case-INSENSITIVE, so a
+    # shaped recipe keyed on both "I" and "i" throws and would be dropped silently. The anvil is
+    # the only vanilla recipe that does this, and losing it means no route to an anvil at all.
+    # JavaScriptSerializer returns an ordinal-keyed Dictionary, which keeps the two apart.
+    try {
+        $r = $json | ConvertFrom-Json
+    } catch {
+        $r = ConvertTo-CaseSensitiveRecipe $json
+        if (-not $r) { continue }
+    }
 
     $type = ($r.type -replace "^minecraft:", "")
     $resultId = Get-ResultId $r.result
@@ -97,7 +132,15 @@ foreach ($entry in $entries) {
             foreach ($row in $r.pattern) {
                 foreach ($ch in $row.ToCharArray()) {
                     if ($ch -eq ' ') { continue }
-                    $tok = Read-Ingredient $r.key.$ch
+                    # `key` is a case-sensitive dictionary for recipes that needed the fallback
+                    # parser, and an ordinary object for everything else.
+                    $slot = [string]$ch
+                    $raw = if ($r.key -is [System.Collections.IDictionary]) {
+                        if ($r.key.ContainsKey($slot)) { $r.key[$slot] } else { $null }
+                    } else {
+                        $r.key.$slot
+                    }
+                    $tok = Read-Ingredient $raw
                     if (-not $tok) { continue }
                     if ($counts.Contains($tok)) { $counts[$tok] += 1 } else { $counts[$tok] = 1 }
                 }

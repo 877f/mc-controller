@@ -4,6 +4,7 @@ import com.mccontroler.bot.BaritoneBridge;
 import com.mccontroler.inv.BlockPlacer;
 import com.mccontroler.inv.FuelConfig;
 import com.mccontroler.inv.InventoryHelper;
+import com.mccontroler.inv.Screens;
 import com.mccontroler.inv.Stations;
 import com.mccontroler.web.EventStream;
 import net.minecraft.client.Minecraft;
@@ -326,6 +327,9 @@ public final class SmeltJob implements Job {
         }
         BlockHitResult hit = new BlockHitResult(
                 Vec3.atCenterOf(furnacePos), Direction.UP, furnacePos, false);
+        // The screen arrives a few ticks later, from the server. Flag it now so it still gets
+        // closed if this job ends before it lands.
+        Screens.expectOpen();
         mc.gameMode.useItemOn(player, InteractionHand.MAIN_HAND, hit);
         return Job.State.RUNNING;
     }
@@ -494,9 +498,8 @@ public final class SmeltJob implements Job {
      * {@code findFurnaceNearby} reuses it on the next run instead of crafting another.
      */
     private Job.State cleanup(LocalPlayer player, Job.State result) {
-        if (player.containerMenu instanceof AbstractFurnaceMenu) {
-            player.closeContainer();
-        }
+        // Closes the screen as well as the menu; closing only the menu leaves the mouse released.
+        Screens.closeAny();
         if (placedFurnace && furnacePos != null) {
             EventStream.log("left the furnace at " + furnacePos.toShortString() + " for next time");
         }

@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="bar">
+
+<header class="topbar">
     <div class="brand">MC&nbsp;Controler</div>
     <div id="status" class="status status--off">
         <span class="dot"></span><span id="status-text">connecting…</span>
@@ -15,279 +16,374 @@
 </header>
 
 <nav class="tabs" role="tablist">
-    <button class="tab is-active" data-tab="gather" role="tab">Gather</button>
-    <button class="tab" data-tab="trees" role="tab">Trees</button>
-    <button class="tab" data-tab="excavate" role="tab">Excavate</button>
-    <button class="tab" data-tab="kits" role="tab">Kits</button>
-    <button class="tab" data-tab="places" role="tab">Places</button>
-    <button class="tab" data-tab="fuel" role="tab">Settings</button>
-    <button class="tab" data-tab="build" role="tab">Build</button>
+    <button class="tab is-active" data-tab="get" role="tab">
+        <span class="tab__label">Get</span>
+        <span class="tab__sub">items &amp; lists</span>
+    </button>
+    <button class="tab" data-tab="tasks" role="tab">
+        <span class="tab__label">Tasks</span>
+        <span class="tab__sub">trees, dig, build</span>
+    </button>
+    <button class="tab" data-tab="places" role="tab">
+        <span class="tab__label">Places</span>
+        <span class="tab__sub">travel &amp; storage</span>
+    </button>
+    <button class="tab" data-tab="settings" role="tab">
+        <span class="tab__label">Settings</span>
+        <span class="tab__sub">behaviour &amp; rules</span>
+    </button>
 </nav>
 
 <main>
-    <!-- ── Gather ─────────────────────────────────────────────── -->
-    <section class="panel is-active" data-panel="gather">
-        <div class="picker">
-            <input id="search" type="search" placeholder="Search blocks and items…" autocomplete="off" spellcheck="false">
-            <label class="toggle">
-                <input id="blocks-only" type="checkbox" checked> Blocks only
-            </label>
+
+    <!-- ══ GET ═══════════════════════════════════════════════════ -->
+    <section class="panel is-active" data-panel="get">
+
+        <div class="searchbar">
+            <input id="search" type="search" placeholder="Search any block or item…"
+                   autocomplete="off" spellcheck="false">
+            <label class="check"><input id="blocks-only" type="checkbox" checked> Blocks only</label>
         </div>
+
         <div id="grid" class="grid" role="listbox" aria-label="Items"></div>
-        <p id="grid-empty" class="empty" hidden>No matches.</p>
-    </section>
+        <p id="grid-empty" class="empty" hidden>Nothing matches that search.</p>
 
-    <!-- ── Trees ──────────────────────────────────────────────── -->
-    <section class="panel" data-panel="trees">
-        <div class="field">
-            <label for="tree-kind">Log type</label>
-            <select id="tree-kind"></select>
-        </div>
-        <div class="field">
-            <label for="tree-mode">Mode</label>
-            <select id="tree-mode">
-                <option value="loop">Sustainable — fell and replant</option>
-                <option value="count">One-shot — fell only, no replanting</option>
-            </select>
-        </div>
-        <div class="field">
-            <label for="tree-count">Stop after collecting</label>
-            <input id="tree-count" type="number" min="0" value="64">
-            <p class="hint" id="tree-count-note"></p>
-        </div>
-        <button class="go" data-job="tree">Start tree job</button>
-    </section>
+        <details class="card card--collapse" id="list-card">
+            <summary>
+                <span class="card__title">Queue a list</span>
+                <span class="card__hint">Several things at once — each is planned in order, so a
+                    later item can use what an earlier one made.</span>
+            </summary>
 
-    <!-- ── Excavate ───────────────────────────────────────────── -->
-    <section class="panel" data-panel="excavate">
-        <p class="hint">Define a box by two opposite corners. Use <em>Use player position</em> to
-            capture where you are standing.</p>
-        <div class="corners">
-            <div class="corner">
-                <h3>Corner A</h3>
-                <div class="xyz">
-                    <input id="ax" type="number" placeholder="x"><input id="ay" type="number" placeholder="y"><input id="az" type="number" placeholder="z">
+            <div class="card__body">
+                <div class="row">
+                    <input id="kit-item" type="text" list="block-list" placeholder="minecraft:torch"
+                           autocomplete="off">
+                    <input id="kit-count" type="number" min="1" value="1" class="qty">
+                    <button class="btn" id="kit-add">Add</button>
                 </div>
-                <button class="ghost" data-fill="a">Use player position</button>
-            </div>
-            <div class="corner">
-                <h3>Corner B</h3>
-                <div class="xyz">
-                    <input id="bx" type="number" placeholder="x"><input id="by" type="number" placeholder="y"><input id="bz" type="number" placeholder="z">
+
+                <ul id="kit-lines" class="rows"></ul>
+                <p id="kit-empty" class="empty">Nothing in the list yet.</p>
+
+                <div class="row row--split">
+                    <button class="btn btn--go" id="kit-run">Run the list</button>
+                    <span class="row__spacer"></span>
+                    <input id="kit-name" type="text" placeholder="Save as…" autocomplete="off">
+                    <button class="btn" id="kit-save">Save</button>
                 </div>
-                <button class="ghost" data-fill="b">Use player position</button>
+
+                <h4 class="subhead">Saved lists</h4>
+                <ul id="kit-saved" class="rows"></ul>
+                <p id="kit-saved-empty" class="empty" hidden>No saved lists yet.</p>
+            </div>
+        </details>
+    </section>
+
+    <!-- ══ TASKS ═════════════════════════════════════════════════ -->
+    <section class="panel" data-panel="tasks">
+
+        <nav class="segmented" role="tablist">
+            <button class="seg is-active" data-sub="trees">Trees</button>
+            <button class="seg" data-sub="excavate">Excavate</button>
+            <button class="seg" data-sub="build">Build</button>
+        </nav>
+
+        <!-- ── Trees ── -->
+        <div class="sub is-active" data-sub="trees">
+            <div class="card">
+                <div class="card__body">
+                    <div class="field">
+                        <label for="tree-kind">Log type</label>
+                        <select id="tree-kind"></select>
+                    </div>
+                    <div class="field">
+                        <label for="tree-mode">Mode</label>
+                        <select id="tree-mode">
+                            <option value="loop">Sustainable — fell and replant</option>
+                            <option value="count">One-shot — fell only, no replanting</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="tree-count">Stop after collecting</label>
+                        <input id="tree-count" type="number" min="0" value="64">
+                        <p class="hint" id="tree-count-note"></p>
+                    </div>
+                    <button class="btn btn--go btn--wide" data-job="tree">Start tree job</button>
+                </div>
             </div>
         </div>
-        <p id="excavate-size" class="hint"></p>
-        <button class="go" data-job="excavate">Start excavation</button>
-    </section>
 
-    <!-- ── Kits ───────────────────────────────────────────────── -->
-    <section class="panel" data-panel="kits">
-        <h3 class="section-h">Build a list</h3>
-        <p class="hint">Queue several things at once. Each line is planned separately and runs in
-            order, so a later item can use what an earlier one produced.</p>
+        <!-- ── Excavate ── -->
+        <div class="sub" data-sub="excavate">
+            <div class="card">
+                <div class="card__body">
+                    <p class="hint">Clears everything between two opposite corners.</p>
 
-        <div class="saverow">
-            <input id="kit-item" type="text" list="build-block-list" placeholder="minecraft:torch" autocomplete="off">
-            <input id="kit-count" type="number" min="1" value="1" style="max-width:90px">
-            <button class="ghost" id="kit-add">Add</button>
+                    <div class="corners">
+                        <div class="corner">
+                            <h4>Corner A</h4>
+                            <div class="xyz">
+                                <input id="ax" type="number" placeholder="x">
+                                <input id="ay" type="number" placeholder="y">
+                                <input id="az" type="number" placeholder="z">
+                            </div>
+                            <button class="btn btn--sm" data-fill="a">Use player position</button>
+                        </div>
+                        <div class="corner">
+                            <h4>Corner B</h4>
+                            <div class="xyz">
+                                <input id="bx" type="number" placeholder="x">
+                                <input id="by" type="number" placeholder="y">
+                                <input id="bz" type="number" placeholder="z">
+                            </div>
+                            <button class="btn btn--sm" data-fill="b">Use player position</button>
+                        </div>
+                    </div>
+
+                    <p id="excavate-size" class="measure"></p>
+                    <button class="btn btn--go btn--wide" data-job="excavate">Start excavation</button>
+                </div>
+            </div>
         </div>
 
-        <ul id="kit-lines" class="places"></ul>
-        <p id="kit-empty" class="empty">Nothing in the list yet.</p>
+        <!-- ── Build ── -->
+        <div class="sub" data-sub="build">
+            <div class="card">
+                <div class="card__body">
+                    <p class="hint">Floors, walls, platforms and rooms are all boxes — a floor is a
+                        box one block tall. If the bot lacks the material it gathers it first.</p>
 
-        <div class="saverow" style="margin-top:12px">
-            <button class="go" id="kit-run">Run the list</button>
-            <input id="kit-name" type="text" placeholder="Save as… e.g. starter kit" autocomplete="off">
-            <button class="ghost" id="kit-save">Save</button>
+                    <div class="corners">
+                        <div class="corner">
+                            <h4>Corner A</h4>
+                            <div class="xyz">
+                                <input id="bax" type="number" placeholder="x">
+                                <input id="bay" type="number" placeholder="y">
+                                <input id="baz" type="number" placeholder="z">
+                            </div>
+                            <button class="btn btn--sm" data-fill="ba">Use player position</button>
+                        </div>
+                        <div class="corner">
+                            <h4>Corner B</h4>
+                            <div class="xyz">
+                                <input id="bbx" type="number" placeholder="x">
+                                <input id="bby" type="number" placeholder="y">
+                                <input id="bbz" type="number" placeholder="z">
+                            </div>
+                            <button class="btn btn--sm" data-fill="bb">Use player position</button>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="build-block">Block</label>
+                        <input id="build-block" type="text" list="block-list"
+                               placeholder="minecraft:cobblestone" autocomplete="off">
+                        <datalist id="block-list"></datalist>
+                    </div>
+
+                    <div class="field">
+                        <label for="build-shape">Shape</label>
+                        <select id="build-shape">
+                            <option value="fill">Solid — fill every block</option>
+                            <option value="hollow">Hollow — shell with floor and ceiling</option>
+                            <option value="walls">Walls only — open above and below</option>
+                        </select>
+                    </div>
+
+                    <p id="build-size" class="measure"></p>
+                    <button class="btn btn--go btn--wide" data-job="buildbox">Build it</button>
+                </div>
+            </div>
         </div>
-
-        <h3 class="section-h">Saved kits</h3>
-        <ul id="kit-saved" class="places"></ul>
-        <p id="kit-saved-empty" class="empty" hidden>No saved kits yet.</p>
     </section>
 
-    <!-- ── Places ─────────────────────────────────────────────── -->
+    <!-- ══ PLACES ════════════════════════════════════════════════ -->
     <section class="panel" data-panel="places">
-        <div class="places__quick">
-            <button class="go" data-job="surface">Go to the surface</button>
-            <button class="go" data-job="portal">Go to nearest portal</button>
-            <span class="hint">Surface digs up and out. Portal finds the closest nether portal
-                in the loaded world and stands beside it.</span>
-        </div>
 
-        <div class="field">
-            <label>Home chest</label>
-            <div class="saverow">
-                <span id="chest-state" class="fuel-meta">not set</span>
-                <button class="ghost" id="chest-set">Set home chest</button>
-                <button class="ghost" id="chest-go">Deposit now</button>
-            </div>
-            <p class="hint">Stand the bot next to a chest and press Set. When the inventory fills
-                mid-job it will unload there and carry on, keeping its tools, food and torches.</p>
-        </div>
-
-        <div class="field">
-            <label>Assigned stations</label>
-            <div class="saverow">
-                <span id="station-table" class="fuel-meta">table: any</span>
-                <button class="ghost" data-assign="table">Assign table</button>
-                <button class="ghost" data-clear="table">Clear</button>
-            </div>
-            <div class="saverow" style="margin-top:6px">
-                <span id="station-furnace" class="fuel-meta">furnace: any</span>
-                <button class="ghost" data-assign="furnace">Assign furnace</button>
-                <button class="ghost" data-clear="furnace">Clear</button>
-            </div>
-            <p class="hint">Stand the bot next to one and press Assign. It will then walk to that
-                exact block every time and never place or craft another, until you clear it.</p>
-        </div>
-
-        <div class="field">
-            <label for="wp-name">Save where the bot is standing</label>
-            <div class="saverow">
-                <input id="wp-name" type="text" placeholder="e.g. Home base" autocomplete="off">
-                <button class="ghost" id="wp-save">Save</button>
-            </div>
-        </div>
-
-        <ul id="wp-list" class="places"></ul>
-        <p id="wp-empty" class="empty" hidden>No saved places yet.</p>
-    </section>
-
-    <!-- ── Fuel ───────────────────────────────────────────────── -->
-    <section class="panel" data-panel="fuel">
-        <h3 class="section-h">Automatic behaviour</h3>
-        <p class="hint">Things the bot does on its own. Turn any of them off if they get in your
-            way — auto-eat in particular takes over your hotbar while it works.</p>
-
-        <ul class="toggles">
-            <li>
-                <label class="toggle"><input type="checkbox" data-setting="autoEat"> Auto-eat</label>
-                <span class="fuel-meta">eats when hunger drops below 17</span>
-            </li>
-            <li>
-                <label class="toggle"><input type="checkbox" data-setting="autoTorch"> Place torches</label>
-                <span class="fuel-meta">while working in the dark, to stop mobs spawning</span>
-            </li>
-            <li>
-                <label class="toggle"><input type="checkbox" data-setting="autoRespawn"> Auto-respawn</label>
-                <span class="fuel-meta">on death, and saves the spot as the place "death"</span>
-            </li>
-        </ul>
-
-        <h3 class="section-h">Materials</h3>
-        <p class="hint">Recipes name whole families — <code>#planks</code> covers every wood — so
-            the bot picks by cost. List a material to prefer it when the cost is close, or ban one
-            to keep it out of plans entirely. One id per line.</p>
-
-        <div class="corners">
-            <div class="corner">
-                <h3>Prefer, best first</h3>
-                <textarea id="mat-prefer" rows="5" placeholder="minecraft:birch_log&#10;minecraft:spruce_log"></textarea>
-            </div>
-            <div class="corner">
-                <h3>Never use</h3>
-                <textarea id="mat-ban" rows="5" placeholder="minecraft:oak_log"></textarea>
-            </div>
-        </div>
-        <button class="go" id="mat-save">Save materials</button>
-
-        <h3 class="section-h">Fuel</h3>
-        <p class="hint">Everything the game treats as fuel. Untick anything the bot should never
-            burn. Ticked items are used top-first, so move the ones you want spent first to the
-            top with the arrows. "Smelts" is how many items one of it will cook.</p>
-
-        <div class="fuelbar">
-            <label class="toggle"><input id="fuel-only-have" type="checkbox" checked> Only show what I'm carrying</label>
-            <button id="fuel-save" class="go">Save</button>
-        </div>
-
-        <ul id="fuel-list" class="fuels"></ul>
-        <p id="fuel-empty" class="empty" hidden>Nothing to show — untick the filter to see every fuel.</p>
-    </section>
-
-    <!-- ── Build ──────────────────────────────────────────────── -->
-    <section class="panel" data-panel="build">
-        <h3 class="section-h">Build a box</h3>
-        <p class="hint">Floors, walls, platforms, pillars and rooms are all boxes — a floor is
-            just a box one block tall. If the bot lacks the material it gathers it first.</p>
-
-        <div class="corners">
-            <div class="corner">
-                <h3>Corner A</h3>
-                <div class="xyz">
-                    <input id="bax" type="number" placeholder="x"><input id="bay" type="number" placeholder="y"><input id="baz" type="number" placeholder="z">
+        <div class="card">
+            <div class="card__body">
+                <h4 class="subhead subhead--first">Go somewhere</h4>
+                <div class="row">
+                    <button class="btn btn--go" data-job="surface">Go to the surface</button>
+                    <button class="btn btn--go" data-job="portal">Go to nearest portal</button>
                 </div>
-                <button class="ghost" data-fill="ba">Use player position</button>
+                <p class="hint">Surface digs up and out. Portal finds the closest nether portal in
+                    the loaded world and stands beside it.</p>
             </div>
-            <div class="corner">
-                <h3>Corner B</h3>
-                <div class="xyz">
-                    <input id="bbx" type="number" placeholder="x"><input id="bby" type="number" placeholder="y"><input id="bbz" type="number" placeholder="z">
+        </div>
+
+        <div class="card">
+            <div class="card__body">
+                <h4 class="subhead subhead--first">Home chest</h4>
+                <div class="row">
+                    <span id="chest-state" class="pill">not set</span>
+                    <span class="row__spacer"></span>
+                    <button class="btn" id="chest-set">Set to nearby chest</button>
+                    <button class="btn" id="chest-go">Deposit now</button>
                 </div>
-                <button class="ghost" data-fill="bb">Use player position</button>
+                <p class="hint">Stand the bot next to a chest and press Set. When the inventory
+                    fills mid-job it unloads there and carries on, keeping tools, food and torches.</p>
             </div>
         </div>
 
-        <div class="field">
-            <label for="build-block">Block</label>
-            <input id="build-block" type="text" list="build-block-list" placeholder="minecraft:cobblestone" autocomplete="off">
-            <datalist id="build-block-list"></datalist>
-        </div>
-
-        <div class="field">
-            <label for="build-shape">Shape</label>
-            <select id="build-shape">
-                <option value="fill">Solid — fill every block</option>
-                <option value="hollow">Hollow — shell with floor and ceiling</option>
-                <option value="walls">Walls only — open above and below</option>
-            </select>
-        </div>
-
-        <p id="build-size" class="hint"></p>
-        <button class="go" data-job="buildbox">Build it</button>
-
-        <h3 class="section-h">From a schematic file</h3>
-        <p class="hint">Upload a <code>.litematic</code>, <code>.schem</code> or <code>.nbt</code>
-            schematic and the bot will build it starting at the given origin.</p>
-        <input id="schematic" type="file" accept=".litematic,.schem,.schematic,.nbt">
-        <div class="field">
-            <label>Origin</label>
-            <div class="xyz">
-                <input id="ox" type="number" placeholder="x"><input id="oy" type="number" placeholder="y"><input id="oz" type="number" placeholder="z">
+        <div class="card">
+            <div class="card__body">
+                <h4 class="subhead subhead--first">Assigned stations</h4>
+                <div class="row">
+                    <span id="station-table" class="pill">table: any</span>
+                    <span class="row__spacer"></span>
+                    <button class="btn" data-assign="table">Assign table</button>
+                    <button class="btn" data-clear="table">Clear</button>
+                </div>
+                <div class="row">
+                    <span id="station-furnace" class="pill">furnace: any</span>
+                    <span class="row__spacer"></span>
+                    <button class="btn" data-assign="furnace">Assign furnace</button>
+                    <button class="btn" data-clear="furnace">Clear</button>
+                </div>
+                <p class="hint">Stand the bot next to one and press Assign. It then walks to that
+                    exact block every time and never places or crafts another, until you clear it.</p>
             </div>
         </div>
-        <button class="ghost" data-fill="o">Use player position</button>
-        <button class="go" data-job="build">Build schematic</button>
+
+        <div class="card">
+            <div class="card__body">
+                <h4 class="subhead subhead--first">Saved places</h4>
+                <div class="row">
+                    <input id="wp-name" type="text" placeholder="Name this spot…" autocomplete="off">
+                    <button class="btn" id="wp-save">Save where bot is</button>
+                </div>
+                <ul id="wp-list" class="rows"></ul>
+                <p id="wp-empty" class="empty" hidden>No saved places yet.</p>
+            </div>
+        </div>
     </section>
+
+    <!-- ══ SETTINGS ══════════════════════════════════════════════ -->
+    <section class="panel" data-panel="settings">
+
+        <!-- Toggles come first deliberately: these are the ones you reach for mid-game,
+             and burying them under the long fuel table made auto-eat impossible to find. -->
+        <div class="card">
+            <div class="card__body">
+                <h4 class="subhead subhead--first">Automatic behaviour</h4>
+                <p class="hint">Things the bot does on its own. These save the moment you click —
+                    no Save button.</p>
+
+                <ul class="toggles">
+                    <li>
+                        <label class="switch">
+                            <input type="checkbox" data-setting="autoEat">
+                            <span class="switch__track"></span>
+                            <span class="switch__text">
+                                <strong>Auto-eat</strong>
+                                <em>eats when hunger drops below 17 — takes over your hotbar while it does</em>
+                            </span>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="switch">
+                            <input type="checkbox" data-setting="autoTorch">
+                            <span class="switch__track"></span>
+                            <span class="switch__text">
+                                <strong>Place torches</strong>
+                                <em>while working in the dark, to stop mobs spawning</em>
+                            </span>
+                        </label>
+                    </li>
+                    <li>
+                        <label class="switch">
+                            <input type="checkbox" data-setting="autoRespawn">
+                            <span class="switch__track"></span>
+                            <span class="switch__text">
+                                <strong>Auto-respawn</strong>
+                                <em>on death, and saves the spot as the place “death”</em>
+                            </span>
+                        </label>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <details class="card card--collapse">
+            <summary>
+                <span class="card__title">Materials</span>
+                <span class="card__hint">Which wood, stone or ore the planner reaches for.</span>
+            </summary>
+            <div class="card__body">
+                <p class="hint">Recipes name whole families — <code>#planks</code> covers every wood —
+                    so the bot picks by cost. Prefer a material to win close calls, or ban one to keep
+                    it out of plans entirely. One id per line.</p>
+
+                <div class="corners">
+                    <div class="corner">
+                        <h4>Prefer, best first</h4>
+                        <textarea id="mat-prefer" rows="5"
+                                  placeholder="minecraft:birch_log&#10;minecraft:spruce_log"></textarea>
+                    </div>
+                    <div class="corner">
+                        <h4>Never use</h4>
+                        <textarea id="mat-ban" rows="5" placeholder="minecraft:oak_log"></textarea>
+                    </div>
+                </div>
+                <button class="btn btn--go" id="mat-save">Save materials</button>
+            </div>
+        </details>
+
+        <details class="card card--collapse">
+            <summary>
+                <span class="card__title">Fuel</span>
+                <span class="card__hint">What may be burned in a furnace, and in what order.</span>
+            </summary>
+            <div class="card__body">
+                <p class="hint">Untick anything the bot should never burn. Ticked items are used
+                    top-first — move what you want spent first to the top. “Smelts” is how many
+                    items one of it will cook.</p>
+
+                <div class="row row--split">
+                    <label class="check">
+                        <input id="fuel-only-have" type="checkbox" checked> Only what I'm carrying
+                    </label>
+                    <span class="row__spacer"></span>
+                    <button id="fuel-save" class="btn btn--go">Save fuel</button>
+                </div>
+
+                <ul id="fuel-list" class="fuels"></ul>
+                <p id="fuel-empty" class="empty" hidden>Nothing to show — untick the filter to see
+                    every fuel.</p>
+            </div>
+        </details>
+    </section>
+
 </main>
 
-<!-- ── Job dock ───────────────────────────────────────────────── -->
+<!-- ══ Job dock ══════════════════════════════════════════════════ -->
 <aside id="dock" class="dock">
     <div class="dock__head">
+        <button id="dock-toggle" class="dock__toggle" title="Collapse or expand">▾</button>
         <span id="job-title">Idle</span>
+        <span class="row__spacer"></span>
         <div class="dock__actions">
-            <button id="shot" class="ghost" title="Take a screenshot and show it below">Shot</button>
-            <button id="drop-junk" class="ghost" title="Throw away bulk stone and dirt to free slots">Drop junk</button>
-            <button id="diagnose" class="ghost" title="Capture the bot's current state">Diagnose</button>
-            <button id="copy-log" class="ghost" title="Copy the whole log to the clipboard">Copy log</button>
-            <button id="stop" class="stop" hidden>Stop</button>
+            <button id="shot" class="btn btn--sm" title="Take a screenshot and show it below">Shot</button>
+            <button id="drop-junk" class="btn btn--sm" title="Throw away bulk stone and dirt to free slots">Drop junk</button>
+            <button id="diagnose" class="btn btn--sm" title="Capture the bot's current state">Diagnose</button>
+            <button id="copy-log" class="btn btn--sm" title="Copy the whole log to the clipboard">Copy log</button>
+            <button id="stop" class="btn btn--stop" hidden>Stop</button>
         </div>
     </div>
     <div class="progress"><div id="progress-bar"></div></div>
     <div class="dock__body">
         <ol id="log" class="log"></ol>
         <div class="queue">
-            <div class="queue__head">Up next <span id="queue-count">0</span></div>
+            <div class="queue__head">Up next <span id="queue-count" class="badge">0</span></div>
             <ol id="queue-list" class="queue__list"></ol>
             <p id="queue-empty" class="queue__empty">Nothing queued.</p>
         </div>
     </div>
 </aside>
 
-<!-- ── Order sheet ────────────────────────────────────────────── -->
+<!-- ══ Order sheet ═══════════════════════════════════════════════ -->
 <div id="sheet" class="sheet" hidden>
     <div class="sheet__card">
         <img id="sheet-icon" alt="" width="48" height="48">
@@ -304,8 +400,10 @@
             <button data-count="256">256</button>
         </div>
         <div class="sheet__actions">
-            <button id="sheet-cancel" class="ghost">Cancel</button>
-            <button id="sheet-go" class="go">Get it</button>
+            <button id="sheet-add" class="btn">Add to list</button>
+            <span class="row__spacer"></span>
+            <button id="sheet-cancel" class="btn">Cancel</button>
+            <button id="sheet-go" class="btn btn--go">Get it</button>
         </div>
     </div>
 </div>
